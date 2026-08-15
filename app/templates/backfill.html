@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Бэкфилл — Sleep Monitor</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Массовый бэкфилл</h1>
+            <div class="header-links">
+                <a href="/" class="btn-outline">← Главная</a>
+                <a href="/logout" class="btn-outline">Выход</a>
+            </div>
+        </header>
+
+        <p>Выберите диапазон дат. Приложение запросит данные из Google Fit за каждый день и создаст/обновит заметки в Obsidian. Субъективные поля (<code>well_being</code>, <code>alco</code>, заметки) для новых записей будут заполнены значениями по умолчанию.</p>
+
+        <form action="/backfill" method="post" class="data-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="date_from">С:</label>
+                    <input type="date" id="date_from" name="date_from" value="{{ date_from or '' }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="date_to">По:</label>
+                    <input type="date" id="date_to" name="date_to" value="{{ date_to or '' }}" required>
+                </div>
+            </div>
+            <button type="submit" class="btn-save">Запустить бэкфилл</button>
+        </form>
+
+        {% if results %}
+        <hr>
+        <h2>Результаты</h2>
+        <table class="backfill-table">
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Статус</th>
+                    <th>Сон (ч)</th>
+                    <th>Пульс (день)</th>
+                    <th>Пульс (сон)</th>
+                    <th>Шаги 1</th>
+                    <th>Шаги 2</th>
+                    <th>Ошибка</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in results %}
+                <tr class="status-{{ r.status }}">
+                    <td><a href="/?date={{ r.date }}">{{ r.date }}</a></td>
+                    <td>
+                        {% if r.status == 'ok' %}✓ OK
+                        {% elif r.status == 'no_data' %}⚠ Нет данных
+                        {% else %}✗ Ошибка сохранения
+                        {% endif %}
+                    </td>
+                    {% if r.data %}
+                    <td>{{ r.data.sleep_hours }}</td>
+                    <td>{{ r.data.pulse_avg_day }}</td>
+                    <td>{{ r.data.pulse_avg_sleep }}</td>
+                    <td>{{ r.data.steps_1 }}</td>
+                    <td>{{ r.data.steps_2 }}</td>
+                    {% else %}
+                    <td colspan="5">—</td>
+                    {% endif %}
+                    <td>{{ r.error }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sleep Monitor — {{ date }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Дневник самочувствия</h1>
+            <div class="header-links">
+                <a href="/backfill" class="btn-outline">Бэкфилл</a>
+                <a href="/logout" class="btn-outline">Выход</a>
+            </div>
+        </header>
+
+        <!-- Recent dates navigation -->
+        <nav class="date-nav">
+            {% for d in recent_dates %}
+            <a href="/?date={{ d }}"
+               class="date-nav-item {% if d == date %}active{% endif %}">
+                {% if d == today %}
+                    <span class="date-nav-label">Сегодня</span>
+                {% elif d == (today | replace(today[-2:], '%02d' | format((today[-2:] | int) - 1))) %}
+                    <span class="date-nav-label">Вчера</span>
+                {% else %}
+                    <span class="date-nav-label">{{ d[5:] }}</span>
+                {% endif %}
+                <span class="date-nav-date">{{ d }}</span>
+            </a>
+            {% endfor %}
+            <!-- Custom date picker -->
+            <form action="/" method="get" class="date-nav-item date-picker-item">
+                <input type="date" name="date" value="{{ date }}" onchange="this.form.submit()" title="Выбрать дату">
+            </form>
+        </nav>
+
+        <div class="actions">
+            <button class="btn-sync" id="sync-btn" onclick="syncData('{{ date }}')">⟳ Подтянуть данные из Google Fit</button>
+            <span id="sync-status"></span>
+        </div>
+
+        <form action="/save" method="post" class="data-form">
+            <input type="hidden" name="date" value="{{ date }}">
+
+            <div class="form-group">
+                <label>Сон (часов):</label>
+                <input type="number" step="0.1" name="sleep_hours" value="{{ data.sleep_hours }}">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Пульс (день):</label>
+                    <input type="number" name="pulse_avg_day" value="{{ data.pulse_avg_day }}">
+                </div>
+                <div class="form-group">
+                    <label>Пульс (сон):</label>
+                    <input type="number" name="pulse_avg_sleep" value="{{ data.pulse_avg_sleep }}">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Шаги (утро):</label>
+                    <input type="number" name="steps_1" value="{{ data.steps_1 }}">
+                </div>
+                <div class="form-group">
+                    <label>Шаги (вечер):</label>
+                    <input type="number" name="steps_2" value="{{ data.steps_2 }}">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Самочувствие (0-10):</label>
+                <input type="range" name="well_being" min="0" max="10" value="{{ data.well_being }}" oninput="this.nextElementSibling.value = this.value">
+                <output>{{ data.well_being }}</output>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <label>
+                    <input type="checkbox" name="alco" value="true" {% if data.alco %}checked{% endif %}>
+                    Был ли алкоголь?
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label>Заметки:</label>
+                <textarea name="notes" rows="5">{{ data.notes }}</textarea>
+            </div>
+
+            <button type="submit" class="btn-save">Сохранить</button>
+        </form>
+    </div>
+
+<script>
+async function syncData(date) {
+    const btn = document.getElementById('sync-btn');
+    const statusEl = document.getElementById('sync-status');
+    btn.disabled = true;
+    statusEl.textContent = 'Загрузка...';
+    try {
+        const resp = await fetch(`/sync?date=${date}`);
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            statusEl.textContent = '⚠ ' + (err.detail || 'Ошибка');
+            btn.disabled = false;
+            return;
+        }
+        const data = await resp.json();
+        document.querySelector('[name=sleep_hours]').value = data.sleep_hours ?? '';
+        document.querySelector('[name=pulse_avg_day]').value = data.pulse_avg_day ?? '';
+        document.querySelector('[name=pulse_avg_sleep]').value = data.pulse_avg_sleep ?? '';
+        document.querySelector('[name=steps_1]').value = data.steps_1 ?? '';
+        document.querySelector('[name=steps_2]').value = data.steps_2 ?? '';
+        statusEl.textContent = '✓ Данные получены';
+    } catch(e) {
+        statusEl.textContent = '⚠ Ошибка сети';
+    }
+    btn.disabled = false;
+}
+</script>
+</body>
+</html>
