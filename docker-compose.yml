@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   obsidian:
     image: sytone/obsidian-remote:latest
@@ -9,15 +7,17 @@ services:
       - PGID=1000
       - TZ=Europe/Moscow
     volumes:
-      - ./vault:/vault:rw
-      - ./config/obsidian:/config:rw
+      - /mnt/hdd/syncthing/AI.obsdn:/vault:rw
+      - /opt/sleepmon/config/obsidian:/config:rw
     ports:
       - "8080:8080" # VNC access for initial setup
       - "27124:27124" # Local REST API
     restart: unless-stopped
 
   app:
-    build: ./app
+    build:
+      context: .
+      dockerfile: app/Dockerfile
     container_name: sleepmon_app
     ports:
       - "8000:8000"
