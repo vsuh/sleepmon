@@ -11,21 +11,24 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
 
     override suspend fun doWork(): Result {
         Log.i("SyncWorker", "Starting background sync")
-        
+
         val prefs = applicationContext.getSharedPreferences("prefs", Context.MODE_PRIVATE)
-        val url = prefs.getString("serverUrl", "") ?: ""
+        val primaryUrl = prefs.getString("serverUrl", "") ?: ""
+        val backupUrl = prefs.getString("serverUrlBackup", "") ?: ""
         val pin = prefs.getString("appPin", "") ?: ""
 
-        if (url.isEmpty() || pin.isEmpty()) {
+        if (primaryUrl.isEmpty() || pin.isEmpty()) {
             Log.w("SyncWorker", "URL or PIN is empty. Aborting.")
             return Result.failure()
         }
 
         val client = HealthConnectClient.getOrCreate(applicationContext)
-        
+
         var isSuccess = true
-        
-        SyncHelper.performSync(client, url, pin, 3) { status ->
+
+        // Sync today + yesterday every hour: cheap, and catches sleep sessions
+        // that only settle in Health Connect after waking up.
+        SyncHelper.performSync(client, primaryUrl, backupUrl, pin, 1) { status ->
             Log.i("SyncWorker", status)
             if (status.startsWith("Error")) {
                 isSuccess = false

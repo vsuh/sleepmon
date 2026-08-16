@@ -11,7 +11,6 @@
         <header>
             <h1>Дневник самочувствия</h1>
             <div class="header-links">
-                <a href="/backfill" class="btn-outline">Бэкфилл</a>
                 <a href="/logout" class="btn-outline">Выход</a>
             </div>
         </header>
@@ -37,10 +36,7 @@
             </form>
         </nav>
 
-        <div class="actions">
-            <button class="btn-sync" id="sync-btn" onclick="syncData('{{ date }}')">⟳ Подтянуть данные из Google Fit</button>
-            <span id="sync-status"></span>
-        </div>
+        <p class="hint">Данные о сне, пульсе и шагах приходят автоматически с телефона (Android Companion App). Здесь можно проверить/поправить значения и сохранить.</p>
 
         <form action="/save" method="post" class="data-form">
             <input type="hidden" name="date" value="{{ date }}">
@@ -93,33 +89,5 @@
             <button type="submit" class="btn-save">Сохранить</button>
         </form>
     </div>
-
-<script>
-async function syncData(date) {
-    const btn = document.getElementById('sync-btn');
-    const statusEl = document.getElementById('sync-status');
-    btn.disabled = true;
-    statusEl.textContent = 'Загрузка...';
-    try {
-        const resp = await fetch(`/sync?date=${date}`);
-        if (!resp.ok) {
-            const err = await resp.json().catch(() => ({}));
-            statusEl.textContent = '⚠ ' + (err.detail || 'Ошибка');
-            btn.disabled = false;
-            return;
-        }
-        const data = await resp.json();
-        document.querySelector('[name=sleep_hours]').value = data.sleep_hours ?? '';
-        document.querySelector('[name=pulse_avg_day]').value = data.pulse_avg_day ?? '';
-        document.querySelector('[name=pulse_avg_sleep]').value = data.pulse_avg_sleep ?? '';
-        document.querySelector('[name=steps_1]').value = data.steps_1 ?? '';
-        document.querySelector('[name=steps_2]').value = data.steps_2 ?? '';
-        statusEl.textContent = '✓ Данные получены';
-    } catch(e) {
-        statusEl.textContent = '⚠ Ошибка сети';
-    }
-    btn.disabled = false;
-}
-</script>
 </body>
 </html>

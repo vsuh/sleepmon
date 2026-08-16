@@ -25,6 +25,22 @@ def set_note_cache(date_str: str, content: str):
     NOTE_CACHE[date_str] = content
 
 
+def parse_note(content: str | None) -> dict:
+    """Extract the fields we need to preserve across a merge-write (used by /sync).
+    Defaults assume a brand-new note: well_being unset (0 = not yet rated),
+    no alcohol flag, no free-text notes.
+    """
+    result = {"well_being": 0, "alco": False, "notes": ""}
+    if content and content.startswith("---"):
+        parts = content.split("---", 2)
+        if len(parts) >= 3:
+            frontmatter = yaml.safe_load(parts[1]) or {}
+            result["well_being"] = frontmatter.get("well_being", 0)
+            result["alco"] = frontmatter.get("alco", False)
+            result["notes"] = parts[2].replace("## Заметки\n\n", "").strip()
+    return result
+
+
 logger = logging.getLogger("sleepmon")
 
 
@@ -124,7 +140,7 @@ async def index(request: Request, background_tasks: BackgroundTasks, date: str =
     })
 
 
-# ---------- Save (Receives data from Android Companion) ----------
+# ---------- Save (manual edit from the web form — full overwrite) ----------
 
 @app.post("/save")
 async def save(request: Request,
@@ -137,8 +153,7 @@ async def save(request: Request,
                well_being: int = Form(5),
                alco: bool = Form(False),
                notes: str = Form("")):
-    # No verify_session for POST from Android App, or check a token/cookie
-    if request.cookies.get("session_pin") != APP_PIN:
+    if not verify_session(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     steps_total = steps_1 + steps_2
@@ -147,7 +162,7 @@ async def save(request: Request,
         "project": "sleepmon",
         "created": date,
         "related": "[[55-sleepmon/index]]",
-        "sleep_hours": sleep_hours,
+        "sleep_hours": round(sleep_hours, 1),
         "pulse_avg_day": pulse_avg_day,
         "pulse_avg_sleep": pulse_avg_sleep,
         "steps_1": steps_1,
@@ -170,3 +185,54 @@ async def save(request: Request,
             content=f"<h2>Ошибка сохранения в Obsidian</h2><p><a href='/?date={date}'>Назад</a></p>",
             status_code=500
         )
+
+
+# ---------- Sync (Android Companion App — merge-write, never touches user fields) ----------
+
+@app.post("/sync")
+async def sync_endpoint(request: Request,
+               date: str = Form(...),
+               sleep_hours: float = Form(0),
+               pulse_avg_day: int = Form(0),
+               pulse_avg_sleep: int = Form(0),
+               steps_1: int = Form(0),
+               steps_2: int = Form(0)):
+    """Automatic hourly sync from the Android app.
+
+    Unlike /save (manual form save, full overwrite), this endpoint MERGES with
+    the existing note: only health-tracker fields (sleep/pulse/steps) are
+    updated. `alco` and free-text `notes` are never touched here, and
+    `well_being` is preserved unless it's still unset (0).
+    """
+    if request.cookies.get("session_pin") != APP_PIN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    existing = parse_note(get_note_cached(date))
+
+    steps_total = steps_1 + steps_2
+    well_being = existing["well_being"] if existing["well_being"] else 0
+
+    frontmatter = {
+        "project": "sleepmon",
+        "created": date,
+        "related": "[[55-sleepmon/index]]",
+        "sleep_hours": round(sleep_hours, 1),
+        "pulse_avg_day": pulse_avg_day,
+        "pulse_avg_sleep": pulse_avg_sleep,
+        "steps_1": steps_1,
+        "steps_2": steps_2,
+        "steps_total": steps_total,
+        "well_being": well_being,
+        "alco": existing["alco"]
+    }
+
+    yaml_content = yaml.dump(frontmatter, sort_keys=False, allow_unicode=True)
+    note_content = f"---\n{yaml_content}---\n\n## Заметки\n\n{existing['notes']}"
+
+    success = obsidian.save_note_content(date, note_content)
+
+    if success:
+        set_note_cache(date, note_content)
+        return JSONResponse({"status": "ok", "date": date})
+    else:
+        raise HTTPException(status_code=502, detail=f"Failed to save note in Obsidian for {date}")
