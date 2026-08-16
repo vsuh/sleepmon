@@ -10,10 +10,15 @@ import logging
 
 from app.config import APP_PIN
 from app import obsidian
+from app.obsidian import ObsidianFetchError
 
 NOTE_CACHE: dict[str, str] = {}
 
 def get_note_cached(date_str: str) -> str | None:
+    """Cached read. Propagates ObsidianFetchError to the caller (does NOT
+    swallow it) — callers decide whether a failed read is safe to treat
+    as "no note" (e.g. the read-only form) or must abort (e.g. /sync,
+    to avoid overwriting real data with a blank template)."""
     if date_str in NOTE_CACHE:
         return NOTE_CACHE[date_str]
     content = obsidian.get_note_content(date_str)
@@ -113,7 +118,13 @@ async def index(request: Request, background_tasks: BackgroundTasks, date: str =
     if not date:
         date = today
 
-    content = get_note_cached(date)
+    # The form must stay usable for manual entry even if Obsidian is down —
+    # so a failed read here just means "no prefill", not an error page.
+    try:
+        content = get_note_cached(date)
+    except ObsidianFetchError as e:
+        logger.warning(f"Could not read note for {date}, showing blank form: {e}")
+        content = None
 
     data = {
         "sleep_hours": "",
@@ -137,11 +148,14 @@ async def index(request: Request, background_tasks: BackgroundTasks, date: str =
                 data["notes"] = parts[2].replace("## Заметки\n\n", "").strip()
 
     recent_dates = get_recent_dates(5)
-    
+
     def preload_cache():
         for d in recent_dates:
-            get_note_cached(d)
-            
+            try:
+                get_note_cached(d)
+            except ObsidianFetchError:
+                pass  # best-effort warmup, ignore failures silently
+
     background_tasks.add_task(preload_cache)
 
     return templates.TemplateResponse(request, "form.html", {
@@ -223,11 +237,25 @@ async def sync_endpoint(request: Request,
       via the web form (/save) can change it after that.
     - `pulse_avg_day` / `pulse_avg_sleep` are NOT fill-once: they reflect
       naturally fluctuating readings and are always updated on every sync.
+
+    CRITICAL: if the existing note can't be reliably read (Obsidian down,
+    unexpected error), this endpoint ABORTS with 502 instead of silently
+    treating it as "no note exists" — that would recreate the note from
+    scratch and wipe out any real data that just happened to be
+    unreadable at that moment.
     """
     if request.cookies.get("session_pin") != APP_PIN:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    existing = parse_note(get_note_cached(date))
+    try:
+        content = get_note_cached(date)
+    except ObsidianFetchError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Cannot verify current note state for {date}, aborting sync to avoid data loss: {e}"
+        )
+
+    existing = parse_note(content)
 
     final_sleep_hours = existing["sleep_hours"] if existing["sleep_hours"] else round(sleep_hours, 1)
     final_steps_1 = existing["steps_1"] if existing["steps_1"] else steps_1

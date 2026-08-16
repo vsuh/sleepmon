@@ -13,6 +13,19 @@ import httpx
 from app.config import OBSIDIAN_BASE_URL, OBSIDIAN_API_KEY
 
 
+class ObsidianFetchError(Exception):
+    """
+    Заметка не может быть достоверно прочитана: Obsidian недоступен,
+    вернул неожиданный статус, или сеть отвалилась.
+
+    ВАЖНО: это НЕ означает "заметки не существует" — это означает
+    "мы не знаем, есть ли там данные, и не должны их затирать".
+    Отличается от обычного None (= заметки точно нет, 404), который
+    безопасно трактовать как "новая заметка".
+    """
+    pass
+
+
 def _note_path(date_str: str) -> str:
     """Вернуть путь к заметке в vault по дате в формате YYYY-MM-DD."""
     year = date_str[:4]
@@ -27,8 +40,15 @@ def get_note_content(date_str: str) -> str | None:
         date_str: Дата в формате YYYY-MM-DD.
 
     Returns:
-        Текст заметки в формате markdown, либо None если заметки нет
-        или Obsidian недоступен.
+        Текст заметки в формате markdown, либо None если заметки
+        действительно нет (404 от Obsidian).
+
+    Raises:
+        ObsidianFetchError: если Obsidian недоступен или вернул
+            неожиданный статус — то есть мы НЕ можем достоверно сказать,
+            есть заметка или нет. Вызывающий код не должен в этом случае
+            молча трактовать это как "новая заметка", чтобы не затереть
+            реальные данные, если она на самом деле существует.
     """
     path = _note_path(date_str)
     url = f"{OBSIDIAN_BASE_URL}/vault/{path}"
@@ -37,12 +57,18 @@ def get_note_content(date_str: str) -> str | None:
     try:
         with httpx.Client(verify=False) as client:
             response = client.get(url, headers=headers)
-            if response.status_code == 200:
-                return response.text
-            return None
     except Exception as e:
         print(f"Error fetching note from obsidian: {e}")
+        raise ObsidianFetchError(str(e)) from e
+
+    if response.status_code == 200:
+        return response.text
+    if response.status_code == 404:
         return None
+
+    # Любой другой статус (5xx, 401, таймаут плагина и т.п.) — тоже
+    # трактуем как "не смогли прочитать", а НЕ как "заметки нет".
+    raise ObsidianFetchError(f"Unexpected status {response.status_code} for {path}")
 
 
 def save_note_content(date_str: str, content: str) -> bool:
