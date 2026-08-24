@@ -29,7 +29,8 @@ class ObsidianFetchError(Exception):
 def _note_path(date_str: str) -> str:
     """Вернуть путь к заметке в vault по дате в формате YYYY-MM-DD."""
     year = date_str[:4]
-    return f"55-sleepmon/{year}/{date_str}.md"
+    month = date_str[5:7]
+    return f"55-sleepmon/{year}/{month}/{date_str}.md"
 
 
 def get_note_content(date_str: str) -> str | None:
