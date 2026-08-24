@@ -10,23 +10,23 @@
 
 ```
 ┌─────────────────┐        Health Connect       ┌──────────────────────┐
-│   Xiaomi Mi Band │ ───────────────────────────▶│  Android Companion   │
-│   (via Mi Fitness)│                             │  App (шаги/пульс/сон)│
-└─────────────────┘                              └──────────┬───────────┘
-                                                              │ POST /sync
-                                                              │ (раз в час, фон)
-                                                              ▼
+│  Xiaomi Mi Band │ ───────────────────────────▶│  Android Companion   │
+│ (via Mi Fitness)│                             │  App (шаги/пульс/сон)│
+└─────────────────┘                             └──────────┬───────────┘
+                                                           │ POST /sync
+                                                           │ (раз в час, фон)
+                                                           ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         Docker Compose (сервер HRLOR)                 │
-│                                                                        │
-│  ┌────────────────────┐   Local REST API    ┌────────────────────┐   │
-│  │  obsidian           │◀────HTTPS:27124────▶│  app (FastAPI)     │   │
-│  │  sytone/obsidian-   │                     │  :8000             │   │
-│  │  remote (headless,  │                     └────────────────────┘   │
-│  │  Xvfb + noVNC :8080)│                                              │
-│  └──────────┬───────────┘                                              │
-│             │ /vault (rw)                                             │
-└─────────────┼──────────────────────────────────────────────────────────┘
+│                        Docker Compose (сервер HRLOR)                 │
+│                                                                      │
+│  ┌─────────────────────┐   Local REST API    ┌────────────────────┐  │
+│  │  obsidian           │◀────HTTPS:27124────▶│  app (FastAPI)     │  │
+│  │  sytone/obsidian-   │                     │  :8000             │  │
+│  │  remote (headless,  │                     └────────────────────┘  │
+│  │  Xvfb + noVNC :8080)│                                             │
+│  └──────────┬──────────┘                                             │
+│             │ /vault (rw)                                            │
+└─────────────┼────────────────────────────────────────────────────────┘
               │
               ▼
      Syncthing-синхронизируемый vault
@@ -89,7 +89,7 @@ alco: false
 ## Требования
 
 - Docker и Docker Compose
-- Сервер на **x86_64** (headless-образ Obsidian не имеет ARM64-сборки — ARM-серверы/TV-приставки не подойдут)
+- Сервер на **x86_64** 
 - Настроенный Syncthing для синхронизации Obsidian-vault (вне зоны ответственности этого приложения)
 
 ---
@@ -101,7 +101,7 @@ alco: false
 Скопируйте `.env.example` в `.env`:
 
 ```env
-APP_PIN=1234
+APP_PIN=0000
 OBSIDIAN_BASE_URL=https://obsidian:27124
 OBSIDIAN_API_KEY=<получите после настройки плагина, см. ниже>
 ```
@@ -122,7 +122,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: app/Dockerfile   # Dockerfile лежит в app/, а не в корне!
+      dockerfile: app/Dockerfile
     ports:
       - "8000:8000"
     env_file:
@@ -131,7 +131,7 @@ services:
       - obsidian
 ```
 
-> ⚠️ Build context для `app` должен быть корнем проекта (`.`), а не `./app` — иначе внутри контейнера пропадёт папка `app/` и `uvicorn app.main:app` упадёт с `ModuleNotFoundError: No module named 'app'`.
+> ⚠️ Build context для `app` должен быть корнем проекта (`.`)
 
 ### 3. Запуск
 
@@ -212,10 +212,10 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 server {
     listen 9124 ssl;
     listen [::]:9124 ssl;
-    server_name sm.vsuh.duckdns.org;
+    server_name АДРЕС_VDNS;
 
-    ssl_certificate     /etc/letsencrypt/live/sm.vsuh.duckdns.org/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/sm.vsuh.duckdns.org/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/АДРЕС_VDNS/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/АДРЕС_VDNS/privkey.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
 
     location / {

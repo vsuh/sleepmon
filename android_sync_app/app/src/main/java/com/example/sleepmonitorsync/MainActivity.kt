@@ -44,15 +44,17 @@ class MainActivity : ComponentActivity() {
 
         // Schedule hourly background sync unconditionally on every app start,
         // so it keeps running even if the app is closed/killed afterwards.
-        // ExistingPeriodicWorkPolicy.KEEP makes this a no-op if already scheduled.
+        // ExistingPeriodicWorkPolicy.UPDATE re-applies the current interval/constraints
+        // to any already-scheduled work with this name, so code changes here always
+        // take effect on next app start instead of being silently ignored.
         SyncScheduler.schedule(applicationContext)
 
         var status by mutableStateOf("Ready")
-        var serverUrl by mutableStateOf(prefs.getString("serverUrl", "http://192.168.2.4:8000") ?: "")
+        var serverUrl by mutableStateOf(prefs.getString("serverUrl", "http://192.168.2.2:8000") ?: "")
         var serverUrlBackup by mutableStateOf(
-            prefs.getString("serverUrlBackup", "https://sm.vsuh.duckdns.org:9124") ?: ""
+            prefs.getString("serverUrlBackup", "https://sm.vsuh.duckdns.org:912") ?: ""
         )
-        var appPin by mutableStateOf(prefs.getString("appPin", "1234") ?: "")
+        var appPin by mutableStateOf(prefs.getString("appPin", "1679") ?: "")
 
         val today = LocalDate.now()
         var rangeFrom by mutableStateOf(today.minusDays(7))
