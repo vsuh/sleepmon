@@ -15,10 +15,14 @@ from app.obsidian import ObsidianFetchError
 NOTE_CACHE: dict[str, str] = {}
 
 def get_note_cached(date_str: str) -> str | None:
-    """Cached read. Propagates ObsidianFetchError to the caller (does NOT
-    swallow it) — callers decide whether a failed read is safe to treat
-    as "no note" (e.g. the read-only form) or must abort (e.g. /sync,
-    to avoid overwriting real data with a blank template)."""
+    """Cached read. Used ONLY for UI display (index form), where a slightly
+    stale value is harmless and speed matters. Propagates ObsidianFetchError
+    to the caller (does NOT swallow it).
+
+    NEVER use this for a merge-write (see /sync) — the cache has no
+    invalidation for edits made directly in Obsidian or by other workers,
+    so a merge based on cached "existing" data can silently overwrite a
+    real value (e.g. well_being) with a stale one."""
     if date_str in NOTE_CACHE:
         return NOTE_CACHE[date_str]
     content = obsidian.get_note_content(date_str)
@@ -28,6 +32,17 @@ def get_note_cached(date_str: str) -> str | None:
 
 def set_note_cache(date_str: str, content: str):
     NOTE_CACHE[date_str] = content
+
+
+def build_related_link(date_str: str) -> str:
+    """Build the `related` frontmatter link for a note, based on its date.
+
+    Points at the monthly index note for that note's year/month:
+    [[55-sleepmon/<YYYY>/index-<MM>.md]] — e.g. for 2026-08-26 that's
+    [[55-sleepmon/2026/index-08.md]]. Month is zero-padded to 2 digits.
+    """
+    year, month, _day = date_str.split("-")
+    return f"[[55-sleepmon/{year}/index-{month}.md]]"
 
 
 def parse_note(content: str | None) -> dict:
@@ -187,7 +202,7 @@ async def save(request: Request,
     frontmatter = {
         "project": "sleepmon",
         "created": date,
-        "related": "[[55-sleepmon/index]]",
+        "related": build_related_link(date),
         "sleep_hours": round(sleep_hours, 1),
         "pulse_avg_day": pulse_avg_day,
         "pulse_avg_sleep": pulse_avg_sleep,
@@ -223,22 +238,33 @@ async def sync_endpoint(request: Request,
                pulse_avg_sleep: int = Form(0),
                steps_1: int = Form(0),
                steps_2: int = Form(0)):
-    """Automatic hourly sync from the Android app.
+    """Automatic periodic sync from the Android app.
 
     Unlike /save (manual form save, full overwrite), this endpoint MERGES with
     the existing note:
 
     - `alco` and free-text `notes` are NEVER touched here (user-owned).
     - `well_being` is preserved unless it's still unset (0).
-    - `sleep_hours`, `steps_1`, `steps_2` (and the derived `steps_total`) are
-      "fill-once" fields: they're only written when the EXISTING value in the
-      note is 0, and only with a non-zero incoming value. Once a real value
-      is recorded, sync will never overwrite it again — only a manual edit
-      via the web form (/save) can change it after that.
+    - `sleep_hours` is "fill-once": only written when the existing value is 0,
+      and only with a non-zero incoming value. Once a real value is recorded,
+      sync will never overwrite it again (can't "re-measure" sleep mid-day).
+    - `steps_1`, `steps_2` (and derived `steps_total`) are ALWAYS updated —
+      they accumulate throughout the day and should reflect current totals.
     - `pulse_avg_day` / `pulse_avg_sleep` are NOT fill-once: they reflect
       naturally fluctuating readings and are always updated on every sync.
+    - `related` is recomputed from the note's own date every time (cheap,
+      deterministic, and self-healing if it was ever wrong).
 
-    CRITICAL: if the existing note can't be reliably read (Obsidian down,
+    CRITICAL #1: the "existing" note state used for the merge is read
+    DIRECTLY from Obsidian, bypassing NOTE_CACHE. This is a merge-write —
+    if we merged against a stale cached copy, a value edited directly in
+    Obsidian (or by a /save on a different worker process) could get
+    silently overwritten with an old value (e.g. well_being reset to 0
+    even though the user just set it). /sync runs infrequently (every
+    ~15 min), so the extra REST round-trip here is cheap; correctness
+    matters far more than shaving off that one request.
+
+    CRITICAL #2: if the existing note can't be reliably read (Obsidian down,
     unexpected error), this endpoint ABORTS with 502 instead of silently
     treating it as "no note exists" — that would recreate the note from
     scratch and wipe out any real data that just happened to be
@@ -248,7 +274,7 @@ async def sync_endpoint(request: Request,
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
-        content = get_note_cached(date)
+        content = obsidian.get_note_content(date)
     except ObsidianFetchError as e:
         raise HTTPException(
             status_code=502,
@@ -257,17 +283,21 @@ async def sync_endpoint(request: Request,
 
     existing = parse_note(content)
 
+    # sleep_hours: fill-once (can't "remeasure" sleep mid-day)
     final_sleep_hours = existing["sleep_hours"] if existing["sleep_hours"] else round(sleep_hours, 1)
-    final_steps_1 = existing["steps_1"] if existing["steps_1"] else steps_1
-    final_steps_2 = existing["steps_2"] if existing["steps_2"] else steps_2
+
+    # steps: ALWAYS update (accumulate throughout the day)
+    final_steps_1 = steps_1
+    final_steps_2 = steps_2
     steps_total = final_steps_1 + final_steps_2
 
+    # well_being: preserve whatever is currently in Obsidian (freshly read above)
     well_being = existing["well_being"] if existing["well_being"] else 0
 
     frontmatter = {
         "project": "sleepmon",
         "created": date,
-        "related": "[[55-sleepmon/index]]",
+        "related": build_related_link(date),
         "sleep_hours": final_sleep_hours,
         "pulse_avg_day": pulse_avg_day,
         "pulse_avg_sleep": pulse_avg_sleep,

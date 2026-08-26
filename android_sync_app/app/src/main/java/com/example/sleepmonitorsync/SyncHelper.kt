@@ -16,8 +16,7 @@ import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 object SyncHelper {
-
-    /** Timeout for a single connection attempt before falling back to the backup server. */
+    private const val TAG = "SyncHelper"
     private const val FALLBACK_TIMEOUT_SECONDS = 5L
 
     /**
@@ -33,6 +32,7 @@ object SyncHelper {
         onStatus: (String) -> Unit
     ) {
         val today = LocalDate.now()
+        Log.i(TAG, "═══ Starting sync: last $days days (from ${today.minusDays(days.toLong())} to $today)")
         performSyncRange(client, primaryUrl, backupUrl, pin, today.minusDays(days.toLong()), today, onStatus)
     }
 
@@ -53,12 +53,16 @@ object SyncHelper {
         onStatus: (String) -> Unit
     ) {
         if (fromDate.isAfter(toDate)) {
-            onStatus("Error: 'from' date is after 'to' date")
+            val msg = "❌ Error: 'from' date ($fromDate) is after 'to' date ($toDate)"
+            Log.e(TAG, msg)
+            onStatus(msg)
             return
         }
 
         try {
+            Log.i(TAG, "Resolving active server (primary: $primaryUrl, backup: $backupUrl)")
             val (activeUrl, cookie) = resolveActiveServer(primaryUrl, backupUrl, pin, onStatus)
+            Log.i(TAG, "✅ Connected to: $activeUrl")
 
             var current = fromDate
             var successCount = 0
@@ -66,22 +70,28 @@ object SyncHelper {
             val totalDays = java.time.temporal.ChronoUnit.DAYS.between(fromDate, toDate) + 1
 
             while (!current.isAfter(toDate)) {
-                onStatus("Syncing $current via $activeUrl (${successCount + errorCount + 1}/$totalDays)...")
+                val dayNum = successCount + errorCount + 1
+                val progressMsg = "📅 Day $dayNum/$totalDays: syncing $current"
+                Log.i(TAG, progressMsg)
+                onStatus(progressMsg)
                 try {
                     syncSingleDay(client, activeUrl, cookie, current)
                     successCount++
+                    Log.i(TAG, "  ✅ $current synced successfully")
                 } catch (e: Exception) {
-                    Log.e("SyncHelper", "Error syncing $current", e)
+                    Log.e(TAG, "  ❌ Error syncing $current: ${e.message}", e)
                     errorCount++
-                    onStatus("Error on $current: ${e.localizedMessage}")
+                    onStatus("❌ Error on $current: ${e.localizedMessage}")
                 }
                 current = current.plusDays(1)
             }
 
-            onStatus("Range sync finished via $activeUrl: $successCount ok, $errorCount errors")
+            val finishMsg = "═══ Sync finished: $successCount ok, $errorCount errors"
+            Log.i(TAG, finishMsg)
+            onStatus(finishMsg)
         } catch (e: Exception) {
-            Log.e("SyncHelper", "Error", e)
-            onStatus("Error: ${e.localizedMessage}")
+            Log.e(TAG, "❌ Fatal error during sync: ${e.message}", e)
+            onStatus("❌ Error: ${e.localizedMessage}")
         }
     }
 
@@ -99,18 +109,22 @@ object SyncHelper {
         val candidates = listOf(primaryUrl, backupUrl).filter { it.isNotBlank() }
         var lastError: Exception? = null
 
-        for (url in candidates) {
+        for ((idx, url) in candidates.withIndex()) {
             try {
+                Log.d(TAG, "Attempting server ${idx + 1}/${candidates.size}: $url")
                 val cookie = login(url, pin)
+                Log.d(TAG, "✅ Login successful to $url")
                 return url to cookie
             } catch (e: Exception) {
-                Log.w("SyncHelper", "Server unreachable: $url (${e.message})")
-                onStatus("$url недоступен, пробую следующий адрес...")
+                Log.w(TAG, "❌ Server $url failed: ${e.message}")
+                onStatus("⚠️ $url недоступен, пробую следующий...")
                 lastError = e
             }
         }
 
-        throw Exception("Все адреса сервера недоступны: ${lastError?.message}")
+        val errMsg = "❌ All servers failed: ${lastError?.message}"
+        Log.e(TAG, errMsg)
+        throw Exception(errMsg)
     }
 
     private suspend fun login(url: String, pin: String): String =
@@ -133,26 +147,37 @@ object SyncHelper {
         cookie: String,
         targetDay: LocalDate
     ) {
+        Log.d(TAG, "↓ Fetching Health Connect data for $targetDay")
+        
         val startOfDay = targetDay.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant()
         val endOfDay = targetDay.plusDays(1).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant()
 
         // 1. Steps
+        Log.d(TAG, "  📊 Reading steps...")
         val stepsRequest = AggregateRequest(
             metrics = setOf(StepsRecord.COUNT_TOTAL),
             timeRangeFilter = TimeRangeFilter.between(startOfDay, endOfDay)
         )
         val stepsResp = client.aggregate(stepsRequest)
         val totalSteps = stepsResp[StepsRecord.COUNT_TOTAL] ?: 0L
+        Log.d(TAG, "  ✓ Steps: $totalSteps")
 
         // 2. Heart Rate
+        Log.d(TAG, "  📊 Reading heart rate...")
         val hrRequest = AggregateRequest(
             metrics = setOf(HeartRateRecord.BPM_AVG),
             timeRangeFilter = TimeRangeFilter.between(startOfDay, endOfDay)
         )
         val hrResp = client.aggregate(hrRequest)
         val hrAvg = hrResp[HeartRateRecord.BPM_AVG] ?: 0L
+        if (hrAvg > 0) {
+            Log.d(TAG, "  ✓ Heart rate avg: $hrAvg BPM")
+        } else {
+            Log.w(TAG, "  ⚠ Heart rate: no data")
+        }
 
         // 3. Sleep
+        Log.d(TAG, "  📊 Reading sleep...")
         val sleepStart = targetDay.minusDays(1).atTime(18, 0).atZone(ZoneId.systemDefault()).toInstant()
         val sleepEnd = targetDay.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant()
         val sleepReq = ReadRecordsRequest(
@@ -165,9 +190,13 @@ object SyncHelper {
             val longest = sleepRecords.maxByOrNull { it.endTime.toEpochMilli() - it.startTime.toEpochMilli() }
             if (longest != null) {
                 sleepHours = (longest.endTime.toEpochMilli() - longest.startTime.toEpochMilli()) / 3600000.0
+                Log.d(TAG, "  ✓ Sleep: $sleepHours hours (${sleepRecords.size} sessions)")
             }
+        } else {
+            Log.w(TAG, "  ⚠ Sleep: no data")
         }
 
+        Log.i(TAG, "📤 Posting to server: steps=$totalSteps, hr=$hrAvg BPM, sleep=$sleepHours h")
         postToServer(url, cookie, targetDay.toString(), sleepHours, hrAvg.toInt(), totalSteps.toInt())
     }
 
@@ -178,30 +207,39 @@ object SyncHelper {
      */
     private suspend fun postToServer(baseUrl: String, cookie: String, date: String, sleep: Double, hr: Int, steps: Int) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val client = OkHttpClient.Builder()
-                .connectTimeout(FALLBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .readTimeout(FALLBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .callTimeout(FALLBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .build()
+            try {
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(FALLBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .readTimeout(FALLBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .callTimeout(FALLBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .build()
 
-            val syncBody = FormBody.Builder()
-                .add("date", date)
-                .add("sleep_hours", sleep.toString())
-                .add("pulse_avg_day", hr.toString())
-                .add("pulse_avg_sleep", "0")
-                .add("steps_1", steps.toString())
-                .add("steps_2", "0")
-                .build()
+                val syncBody = FormBody.Builder()
+                    .add("date", date)
+                    .add("sleep_hours", sleep.toString())
+                    .add("pulse_avg_day", hr.toString())
+                    .add("pulse_avg_sleep", "0")
+                    .add("steps_1", steps.toString())
+                    .add("steps_2", "0")
+                    .build()
 
-            val syncReq = Request.Builder()
-                .url("$baseUrl/sync")
-                .addHeader("Cookie", cookie)
-                .post(syncBody)
-                .build()
+                val syncReq = Request.Builder()
+                    .url("$baseUrl/sync")
+                    .addHeader("Cookie", cookie)
+                    .post(syncBody)
+                    .build()
 
-            val syncResp = client.newCall(syncReq).execute()
-            if (!syncResp.isSuccessful) {
-                throw Exception("Server returned ${syncResp.code} for date $date")
+                Log.d(TAG, "Sending POST to $baseUrl/sync for $date")
+                val syncResp = client.newCall(syncReq).execute()
+                
+                if (syncResp.isSuccessful) {
+                    Log.i(TAG, "✅ Server accepted data for $date (HTTP ${syncResp.code})")
+                } else {
+                    throw Exception("Server returned HTTP ${syncResp.code}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to post to server: ${e.message}", e)
+                throw Exception("Failed to post data to server for $date: ${e.message}")
             }
         }
     }

@@ -42,19 +42,33 @@ class MainActivity : ComponentActivity() {
 
         val prefs = getSharedPreferences("prefs", MODE_PRIVATE)
 
-        // Schedule hourly background sync unconditionally on every app start,
-        // so it keeps running even if the app is closed/killed afterwards.
-        // ExistingPeriodicWorkPolicy.UPDATE re-applies the current interval/constraints
-        // to any already-scheduled work with this name, so code changes here always
-        // take effect on next app start instead of being silently ignored.
-        SyncScheduler.schedule(applicationContext)
+        // Defaults below are only fallback VALUES for display in the UI state —
+        // getString() does NOT persist them to SharedPreferences on its own.
+        // SyncWorker reads these same keys directly from SharedPreferences (with an
+        // empty-string fallback, so it can detect "not configured" and abort safely).
+        // Without writing the defaults back here, a fresh install shows a fully
+        // filled-in form but SyncWorker sees empty values and silently aborts every
+        // hour until the user manually edits a field. Persist any missing default now.
+        val defaultServerUrl = "http://192.168.2.2:8000"
+        val defaultServerUrlBackup = "https://sm.vsuh.duckdns.org:912"
+        val defaultAppPin = "1679"
+        prefs.edit().apply {
+            if (!prefs.contains("serverUrl")) putString("serverUrl", defaultServerUrl)
+            if (!prefs.contains("serverUrlBackup")) putString("serverUrlBackup", defaultServerUrlBackup)
+            if (!prefs.contains("appPin")) putString("appPin", defaultAppPin)
+        }.apply()
+
+        // Background sync scheduling now happens once in SleepMonitorApp.onCreate()
+        // (process start), not here — re-running enqueueUniquePeriodicWork(UPDATE) on
+        // every Activity creation risked racing with WorkManager's own periodic
+        // dispatch, causing duplicate concurrent SyncWorker runs.
 
         var status by mutableStateOf("Ready")
-        var serverUrl by mutableStateOf(prefs.getString("serverUrl", "http://192.168.2.2:8000") ?: "")
+        var serverUrl by mutableStateOf(prefs.getString("serverUrl", defaultServerUrl) ?: "")
         var serverUrlBackup by mutableStateOf(
-            prefs.getString("serverUrlBackup", "https://sm.vsuh.duckdns.org:912") ?: ""
+            prefs.getString("serverUrlBackup", defaultServerUrlBackup) ?: ""
         )
-        var appPin by mutableStateOf(prefs.getString("appPin", "1679") ?: "")
+        var appPin by mutableStateOf(prefs.getString("appPin", defaultAppPin) ?: "")
 
         val today = LocalDate.now()
         var rangeFrom by mutableStateOf(today.minusDays(7))
@@ -114,7 +128,7 @@ class MainActivity : ComponentActivity() {
                         serverUrlBackup = it
                         prefs.edit().putString("serverUrlBackup", it).apply()
                     },
-                    label = { Text("Server URL (резервный, если основной недоступен 5 сек)") },
+                    label = { Text("Server URL (резервный)") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))

@@ -28,8 +28,9 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
 
         // Sync today + yesterday every hour: cheap, and catches sleep sessions
         // that only settle in Health Connect after waking up.
+        // SyncHelper logs each status under the "SyncHelper" tag itself, so we
+        // only need to check the outcome here.
         SyncHelper.performSync(client, primaryUrl, backupUrl, pin, 1) { status ->
-            Log.i("SyncWorker", status)
             if (status.startsWith("Error")) {
                 isSuccess = false
             }
