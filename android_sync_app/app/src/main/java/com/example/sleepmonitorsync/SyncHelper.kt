@@ -11,6 +11,7 @@ import androidx.health.connect.client.time.TimeRangeFilter
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
@@ -141,6 +142,24 @@ object SyncHelper {
             loginResp.header("Set-Cookie") ?: ""
         }
 
+    /**
+     * Average heart rate over [start, end). Returns 0 if there's no data
+     * in that window (e.g. no sleep session found, or genuinely no samples).
+     */
+    private suspend fun avgHeartRate(
+        client: HealthConnectClient,
+        start: Instant,
+        end: Instant
+    ): Long {
+        if (!start.isBefore(end)) return 0L
+        val hrRequest = AggregateRequest(
+            metrics = setOf(HeartRateRecord.BPM_AVG),
+            timeRangeFilter = TimeRangeFilter.between(start, end)
+        )
+        val hrResp = client.aggregate(hrRequest)
+        return hrResp[HeartRateRecord.BPM_AVG] ?: 0L
+    }
+
     private suspend fun syncSingleDay(
         client: HealthConnectClient,
         url: String,
@@ -148,7 +167,7 @@ object SyncHelper {
         targetDay: LocalDate
     ) {
         Log.d(TAG, "↓ Fetching Health Connect data for $targetDay")
-        
+
         val startOfDay = targetDay.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant()
         val endOfDay = targetDay.plusDays(1).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant()
 
@@ -162,42 +181,64 @@ object SyncHelper {
         val totalSteps = stepsResp[StepsRecord.COUNT_TOTAL] ?: 0L
         Log.d(TAG, "  ✓ Steps: $totalSteps")
 
-        // 2. Heart Rate
-        Log.d(TAG, "  📊 Reading heart rate...")
-        val hrRequest = AggregateRequest(
-            metrics = setOf(HeartRateRecord.BPM_AVG),
-            timeRangeFilter = TimeRangeFilter.between(startOfDay, endOfDay)
-        )
-        val hrResp = client.aggregate(hrRequest)
-        val hrAvg = hrResp[HeartRateRecord.BPM_AVG] ?: 0L
-        if (hrAvg > 0) {
-            Log.d(TAG, "  ✓ Heart rate avg: $hrAvg BPM")
-        } else {
-            Log.w(TAG, "  ⚠ Heart rate: no data")
-        }
-
-        // 3. Sleep
+        // 2. Sleep — read BEFORE heart rate, so we know the wake/sleep window
+        // and can split heart rate into "waking hours" vs "sleep" averages
+        // instead of one flat whole-calendar-day average (which is dragged
+        // down by naturally-lower overnight readings and doesn't match what
+        // Mi Fitness shows as "average pulse").
         Log.d(TAG, "  📊 Reading sleep...")
-        val sleepStart = targetDay.minusDays(1).atTime(18, 0).atZone(ZoneId.systemDefault()).toInstant()
-        val sleepEnd = targetDay.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant()
+        val sleepSearchStart = targetDay.minusDays(1).atTime(18, 0).atZone(ZoneId.systemDefault()).toInstant()
+        val sleepSearchEnd = targetDay.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant()
         val sleepReq = ReadRecordsRequest(
             recordType = SleepSessionRecord::class,
-            timeRangeFilter = TimeRangeFilter.between(sleepStart, sleepEnd)
+            timeRangeFilter = TimeRangeFilter.between(sleepSearchStart, sleepSearchEnd)
         )
         val sleepRecords = client.readRecords(sleepReq).records
         var sleepHours = 0.0
+        var sleepStart: Instant? = null
+        var wakeTime: Instant? = null
         if (sleepRecords.isNotEmpty()) {
             val longest = sleepRecords.maxByOrNull { it.endTime.toEpochMilli() - it.startTime.toEpochMilli() }
             if (longest != null) {
+                sleepStart = longest.startTime
+                wakeTime = longest.endTime
                 sleepHours = (longest.endTime.toEpochMilli() - longest.startTime.toEpochMilli()) / 3600000.0
-                Log.d(TAG, "  ✓ Sleep: $sleepHours hours (${sleepRecords.size} sessions)")
+                Log.d(TAG, "  ✓ Sleep: $sleepHours hours (${sleepRecords.size} sessions, wake time: $wakeTime)")
             }
         } else {
             Log.w(TAG, "  ⚠ Sleep: no data")
         }
 
-        Log.i(TAG, "📤 Posting to server: steps=$totalSteps, hr=$hrAvg BPM, sleep=$sleepHours h")
-        postToServer(url, cookie, targetDay.toString(), sleepHours, hrAvg.toInt(), totalSteps.toInt())
+        // 3. Heart rate — split into "day" (waking hours only) and "sleep" averages.
+        Log.d(TAG, "  📊 Reading heart rate...")
+
+        // Waking-hours window: from wake time to end of day. Falls back to the
+        // whole calendar day if we couldn't determine a wake time (no sleep
+        // session found) — better a slightly-off number than none at all.
+        val wakingStart = wakeTime ?: startOfDay
+        val hrDayAvg = avgHeartRate(client, wakingStart, endOfDay)
+        if (hrDayAvg > 0) {
+            Log.d(TAG, "  ✓ Heart rate (waking hours, $wakingStart .. $endOfDay): $hrDayAvg BPM")
+        } else {
+            Log.w(TAG, "  ⚠ Heart rate (waking hours): no data")
+        }
+
+        // Sleep window: only meaningful if we found a sleep session.
+        val hrSleepAvg = if (sleepStart != null && wakeTime != null) {
+            val v = avgHeartRate(client, sleepStart, wakeTime)
+            if (v > 0) {
+                Log.d(TAG, "  ✓ Heart rate (sleep, $sleepStart .. $wakeTime): $v BPM")
+            } else {
+                Log.w(TAG, "  ⚠ Heart rate (sleep window): no data")
+            }
+            v
+        } else {
+            Log.w(TAG, "  ⚠ Heart rate (sleep): skipped, no sleep session")
+            0L
+        }
+
+        Log.i(TAG, "📤 Posting to server: steps=$totalSteps, hr_day=$hrDayAvg BPM, hr_sleep=$hrSleepAvg BPM, sleep=$sleepHours h")
+        postToServer(url, cookie, targetDay.toString(), sleepHours, hrDayAvg.toInt(), hrSleepAvg.toInt(), totalSteps.toInt())
     }
 
     /**
@@ -205,7 +246,15 @@ object SyncHelper {
      * and never touches alco/notes/well_being — those are user-owned fields that
      * only the web form's manual "Сохранить" (/save) is allowed to change.
      */
-    private suspend fun postToServer(baseUrl: String, cookie: String, date: String, sleep: Double, hr: Int, steps: Int) {
+    private suspend fun postToServer(
+        baseUrl: String,
+        cookie: String,
+        date: String,
+        sleep: Double,
+        hrDay: Int,
+        hrSleep: Int,
+        steps: Int
+    ) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val client = OkHttpClient.Builder()
@@ -217,8 +266,8 @@ object SyncHelper {
                 val syncBody = FormBody.Builder()
                     .add("date", date)
                     .add("sleep_hours", sleep.toString())
-                    .add("pulse_avg_day", hr.toString())
-                    .add("pulse_avg_sleep", "0")
+                    .add("pulse_avg_day", hrDay.toString())
+                    .add("pulse_avg_sleep", hrSleep.toString())
                     .add("steps_1", steps.toString())
                     .add("steps_2", "0")
                     .build()
@@ -231,7 +280,7 @@ object SyncHelper {
 
                 Log.d(TAG, "Sending POST to $baseUrl/sync for $date")
                 val syncResp = client.newCall(syncReq).execute()
-                
+
                 if (syncResp.isSuccessful) {
                     Log.i(TAG, "✅ Server accepted data for $date (HTTP ${syncResp.code})")
                 } else {
