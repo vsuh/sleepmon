@@ -101,7 +101,7 @@ alco: false
 Скопируйте `.env.example` в `.env`:
 
 ```env
-APP_PIN=0000
+APP_PIN=00000000<пин код для аутентификации на веб-странице ввода карточек> 
 OBSIDIAN_BASE_URL=https://obsidian:27124
 OBSIDIAN_API_KEY=<получите после настройки плагина, см. ниже>
 ```
@@ -150,13 +150,15 @@ Headless-режим требует ручной настройки один ра
 3. Settings → Community plugins → отключите Safe Mode, установите и включите **Local REST API** (`coddingtonbear/obsidian-local-rest-api`)
 4. В настройках плагина:
    - Скопируйте **API Key** → вставьте в `.env` как `OBSIDIAN_API_KEY`
-   - **Обязательно** смените **Bind Address** с `127.0.0.1` на **`0.0.0.0`** — иначе контейнер `app` не сможет достучаться до Obsidian по внутренней docker-сети (плагин по умолчанию слушает только loopback самого контейнера `obsidian`, а не все интерфейсы)
+   - **Обязательно** смените **Bind Address** HTTPS сервера с `127.0.0.1` на **`0.0.0.0`** — иначе контейнер `app` не сможет достучаться до Obsidian по внутренней docker-сети (плагин по умолчанию слушает только loopback самого контейнера `obsidian`, а не все интерфейсы)
 5. Перезапустите:
+
    ```bash
    docker compose restart obsidian app
    ```
 
-Проверка, что порт слушается правильно:
+Проверка, что порт слушается правильно
+
 ```bash
 docker compose exec obsidian ss -tlnp | grep 27124
 # Ожидаем: LISTEN  0.0.0.0:27124   (а не 127.0.0.1:27124)
@@ -166,7 +168,7 @@ docker compose exec obsidian ss -tlnp | grep 27124
 
 ## Android Companion App
 
-Приложение читает Health Connect и шлёт данные на сервер. Исходники — `android_sync_app/`.
+Приложение читает Health Connect и шлёт данные на сервер. Исходники — в каталоге `android_sync_app/`.
 
 ### Возможности
 
@@ -197,10 +199,10 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 При первом запуске укажите в полях:
 - **Server URL (основной)** — например, `http://192.168.X.X:8000` (локальная сеть)
-- **Server URL (резервный)** — внешний адрес через reverse-proxy, например `https://sm.vsuh.duckdns.org:9124`
+- **Server URL (резервный)** — внешний адрес через reverse-proxy, например `https://sleepmon.example.info:9124`
 - **App PIN** — тот же, что в `.env` сервера
 
-При первом запуске нужно выдать разрешения Health Connect на **Steps, Heart Rate, Sleep** — без них синхронизация не сработает.
+При первом запуске нужно будет выдать разрешения Health Connect на **Steps, Heart Rate, Sleep** приложению Sleep Monitor Sync — без них синхронизация не сработает.
 
 ---
 
@@ -212,10 +214,10 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 server {
     listen 9124 ssl;
     listen [::]:9124 ssl;
-    server_name АДРЕС_VDNS;
+    server_name АДРЕС_DDNS;
 
-    ssl_certificate     /etc/letsencrypt/live/АДРЕС_VDNS/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/АДРЕС_VDNS/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/АДРЕС_DDNS/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/АДРЕС_DDNS/privkey.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
 
     location / {
@@ -251,19 +253,23 @@ server {
 После рестарта/пересоздания контейнера иногда сбрасывается открытый в интерфейсе vault (даже если volume примонтирован верно) — Obsidian просто не помнит, какую папку открывать. Зайдите через VNC (`:8080`) и заново откройте `/vault` вручную. Также после такого пересоздания стоит **перепроверить Bind Address плагина** — настройки могли не сохраниться, если `/config` не был примонтирован как persistent volume.
 
 ### `404 Not Found` на `/sync` или `/backfill`
+
 Контейнер `app` не пересобран после изменения кода — Docker `COPY . .` копирует файлы только при `docker compose build`, не отслеживает изменения "на лету":
+
 ```bash
 docker compose up --build app
 ```
 
 ### Пульс/сон не приходят с браслета, хотя Mi Fitness вроде синхронизирован
+
 Это проблема на стороне **Mi Fitness ↔ Health Connect**, не в коде приложения. Health Connect — пассивное хранилище, оно не умеет "запросить данные заново" — переслать их должен сам Mi Fitness. Что помогает (по убыванию эффективности):
+
 1. Настройки телефона → Health Connect → Приложения и разрешения → Mi Fitness → снять все разрешения → выдать заново
 2. Очистить кэш (не данные!) приложения Mi Fitness
 3. Отключить/включить синхронизацию с Health Connect в самом Mi Fitness, затем нажать "Sync Now" в нашем приложении
 4. Force stop Mi Fitness + повторная Bluetooth-синхронизация с браслетом
 
-Проверяйте именно в **Health Connect** ("Здоровье и спорт" → Просмотр данных), а не в Google Fit — это разные хранилища, Google Fit больше не используется этим проектом.
+Проверяйте именно в **Health Connect** ("Здоровье и спорт" → Просмотр данных), а не в Google Fit — это разные хранилища, Google Fit не используется этим проектом.
 
 ---
 

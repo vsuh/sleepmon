@@ -4,4 +4,4 @@ token.json
 .venv/
 __pycache__/
 *.pyc
-graphify-out\  
+graphify-out/
