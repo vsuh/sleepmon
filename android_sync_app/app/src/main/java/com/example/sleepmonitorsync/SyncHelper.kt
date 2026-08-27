@@ -160,6 +160,52 @@ object SyncHelper {
         return hrResp[HeartRateRecord.BPM_AVG] ?: 0L
     }
 
+    /**
+     * Simple aggregate of one sleep session's stage breakdown, in whole minutes.
+     * "Awake" bucket merges AWAKE / AWAKE_IN_BED / OUT_OF_BED — from a diary
+     * perspective these are all "not actually asleep" time within the session.
+     * Generic STAGE_TYPE_SLEEPING / STAGE_TYPE_UNKNOWN stages (some watches
+     * don't break sleep into light/deep/REM and just report one blob) aren't
+     * attributed to any specific phase and are logged separately so they're
+     * not silently lost from the total.
+     */
+    private data class SleepPhaseBreakdown(
+        val lightMin: Int,
+        val deepMin: Int,
+        val remMin: Int,
+        val awakeMin: Int,
+        val unclassifiedMin: Int
+    )
+
+    private fun computeSleepPhases(session: SleepSessionRecord): SleepPhaseBreakdown {
+        var light = 0L
+        var deep = 0L
+        var rem = 0L
+        var awake = 0L
+        var unclassified = 0L
+
+        for (stage in session.stages) {
+            val minutes = (stage.endTime.toEpochMilli() - stage.startTime.toEpochMilli()) / 60000
+            when (stage.stage) {
+                SleepSessionRecord.STAGE_TYPE_LIGHT -> light += minutes
+                SleepSessionRecord.STAGE_TYPE_DEEP -> deep += minutes
+                SleepSessionRecord.STAGE_TYPE_REM -> rem += minutes
+                SleepSessionRecord.STAGE_TYPE_AWAKE,
+                SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED,
+                SleepSessionRecord.STAGE_TYPE_OUT_OF_BED -> awake += minutes
+                else -> unclassified += minutes // STAGE_TYPE_SLEEPING / STAGE_TYPE_UNKNOWN
+            }
+        }
+
+        return SleepPhaseBreakdown(
+            lightMin = light.toInt(),
+            deepMin = deep.toInt(),
+            remMin = rem.toInt(),
+            awakeMin = awake.toInt(),
+            unclassifiedMin = unclassified.toInt()
+        )
+    }
+
     private suspend fun syncSingleDay(
         client: HealthConnectClient,
         url: String,
@@ -185,7 +231,8 @@ object SyncHelper {
         // and can split heart rate into "waking hours" vs "sleep" averages
         // instead of one flat whole-calendar-day average (which is dragged
         // down by naturally-lower overnight readings and doesn't match what
-        // Mi Fitness shows as "average pulse").
+        // Mi Fitness shows as "average pulse"). Also extracts the phase
+        // breakdown (light/deep/REM/awake) from the same session record.
         Log.d(TAG, "  📊 Reading sleep...")
         val sleepSearchStart = targetDay.minusDays(1).atTime(18, 0).atZone(ZoneId.systemDefault()).toInstant()
         val sleepSearchEnd = targetDay.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant()
@@ -197,6 +244,7 @@ object SyncHelper {
         var sleepHours = 0.0
         var sleepStart: Instant? = null
         var wakeTime: Instant? = null
+        var phases = SleepPhaseBreakdown(0, 0, 0, 0, 0)
         if (sleepRecords.isNotEmpty()) {
             val longest = sleepRecords.maxByOrNull { it.endTime.toEpochMilli() - it.startTime.toEpochMilli() }
             if (longest != null) {
@@ -204,6 +252,14 @@ object SyncHelper {
                 wakeTime = longest.endTime
                 sleepHours = (longest.endTime.toEpochMilli() - longest.startTime.toEpochMilli()) / 3600000.0
                 Log.d(TAG, "  ✓ Sleep: $sleepHours hours (${sleepRecords.size} sessions, wake time: $wakeTime)")
+
+                phases = computeSleepPhases(longest)
+                if (phases.lightMin + phases.deepMin + phases.remMin + phases.awakeMin + phases.unclassifiedMin > 0) {
+                    Log.d(TAG, "  ✓ Sleep phases: light=${phases.lightMin}m deep=${phases.deepMin}m " +
+                            "rem=${phases.remMin}m awake=${phases.awakeMin}m unclassified=${phases.unclassifiedMin}m")
+                } else {
+                    Log.w(TAG, "  ⚠ Sleep phases: session has no stage breakdown (device/app doesn't report stages)")
+                }
             }
         } else {
             Log.w(TAG, "  ⚠ Sleep: no data")
@@ -237,8 +293,12 @@ object SyncHelper {
             0L
         }
 
-        Log.i(TAG, "📤 Posting to server: steps=$totalSteps, hr_day=$hrDayAvg BPM, hr_sleep=$hrSleepAvg BPM, sleep=$sleepHours h")
-        postToServer(url, cookie, targetDay.toString(), sleepHours, hrDayAvg.toInt(), hrSleepAvg.toInt(), totalSteps.toInt())
+        Log.i(TAG, "📤 Posting to server: steps=$totalSteps, hr_day=$hrDayAvg BPM, hr_sleep=$hrSleepAvg BPM, " +
+                "sleep=$sleepHours h, phases(L/D/R/A)=${phases.lightMin}/${phases.deepMin}/${phases.remMin}/${phases.awakeMin} min")
+        postToServer(
+            url, cookie, targetDay.toString(), sleepHours, hrDayAvg.toInt(), hrSleepAvg.toInt(), totalSteps.toInt(),
+            phases.lightMin, phases.deepMin, phases.remMin, phases.awakeMin
+        )
     }
 
     /**
@@ -253,7 +313,11 @@ object SyncHelper {
         sleep: Double,
         hrDay: Int,
         hrSleep: Int,
-        steps: Int
+        steps: Int,
+        sleepLightMin: Int,
+        sleepDeepMin: Int,
+        sleepRemMin: Int,
+        sleepAwakeMin: Int
     ) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
@@ -270,6 +334,10 @@ object SyncHelper {
                     .add("pulse_avg_sleep", hrSleep.toString())
                     .add("steps_1", steps.toString())
                     .add("steps_2", "0")
+                    .add("sleep_light_min", sleepLightMin.toString())
+                    .add("sleep_deep_min", sleepDeepMin.toString())
+                    .add("sleep_rem_min", sleepRemMin.toString())
+                    .add("sleep_awake_min", sleepAwakeMin.toString())
                     .build()
 
                 val syncReq = Request.Builder()

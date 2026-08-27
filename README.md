@@ -10,7 +10,7 @@
 
 ```
 ┌─────────────────┐        Health Connect       ┌──────────────────────┐
-│  Xiaomi Mi Band │ ──────────────────────────▶│  Android Companion   │
+│  Xiaomi Mi Band │◀──────────────────────────▶│  Android Companion   │
 │ (via Mi Fitness)│                             │  App (шаги/пульс/сон)│
 └─────────────────┘                             └──────────┬───────────┘
                                                            │ POST /sync

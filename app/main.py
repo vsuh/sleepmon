@@ -7,10 +7,27 @@ import yaml
 import os
 import asyncio
 import logging
+import time
 
 from app.config import APP_PIN
 from app import obsidian
 from app.obsidian import ObsidianFetchError
+
+# ---------- Logging ----------
+# `docker compose logs -t` timestamps are Docker's own daemon-level log
+# timestamps — always UTC, regardless of the container's TZ env var. TZ only
+# affects processes running *inside* the container. So our own log lines
+# carry their own local-time prefix here (respecting TZ=Europe/Moscow from
+# docker-compose.yml), and `docker compose logs -f app` (WITHOUT -t) is the
+# right way to read them — the app-printed timestamp is already correct,
+# Docker's own -t prefix would only add a second, UTC, misleading one.
+logging.Formatter.converter = time.localtime  # use local (TZ-aware) time, not UTC, for %(asctime)s
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("sleepmon")
 
 NOTE_CACHE: dict[str, str] = {}
 
@@ -50,7 +67,7 @@ def parse_note(content: str | None) -> dict:
 
     Defaults assume a brand-new note (nothing recorded yet):
     well_being unset, no alcohol flag, no free-text notes, and the
-    "fill-once" numeric fields (sleep_hours/steps_1/steps_2) at 0.
+    "fill-once" numeric fields (sleep_hours/steps_1/steps_2/sleep phases) at 0.
     """
     result = {
         "well_being": 0,
@@ -59,6 +76,10 @@ def parse_note(content: str | None) -> dict:
         "sleep_hours": 0,
         "steps_1": 0,
         "steps_2": 0,
+        "sleep_light_min": 0,
+        "sleep_deep_min": 0,
+        "sleep_rem_min": 0,
+        "sleep_awake_min": 0,
     }
     if content and content.startswith("---"):
         parts = content.split("---", 2)
@@ -70,10 +91,11 @@ def parse_note(content: str | None) -> dict:
             result["sleep_hours"] = frontmatter.get("sleep_hours", 0)
             result["steps_1"] = frontmatter.get("steps_1", 0)
             result["steps_2"] = frontmatter.get("steps_2", 0)
+            result["sleep_light_min"] = frontmatter.get("sleep_light_min", 0)
+            result["sleep_deep_min"] = frontmatter.get("sleep_deep_min", 0)
+            result["sleep_rem_min"] = frontmatter.get("sleep_rem_min", 0)
+            result["sleep_awake_min"] = frontmatter.get("sleep_awake_min", 0)
     return result
-
-
-logger = logging.getLogger("sleepmon")
 
 
 app = FastAPI()
@@ -197,6 +219,21 @@ async def save(request: Request,
     if not verify_session(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    logger.info(f"/save called for {date}: sleep={sleep_hours}h, pulse_day={pulse_avg_day}, "
+                f"pulse_sleep={pulse_avg_sleep}, steps={steps_1}+{steps_2}, well_being={well_being}, alco={alco}")
+
+    # Sleep-phase fields (sleep_light_min/deep/rem/awake) aren't part of this
+    # form — they're populated by /sync from Health Connect. Read the current
+    # note first so a manual save doesn't silently wipe them. Best-effort:
+    # if Obsidian is unreachable, fall back to 0 rather than blocking the
+    # manual save (form must stay usable even when Obsidian is down).
+    try:
+        existing_content = obsidian.get_note_content(date)
+        existing = parse_note(existing_content)
+    except ObsidianFetchError as e:
+        logger.warning(f"/save: could not read existing note for {date} to preserve sleep phases: {e}")
+        existing = parse_note(None)
+
     steps_total = steps_1 + steps_2
 
     frontmatter = {
@@ -209,6 +246,10 @@ async def save(request: Request,
         "steps_1": steps_1,
         "steps_2": steps_2,
         "steps_total": steps_total,
+        "sleep_light_min": existing["sleep_light_min"],
+        "sleep_deep_min": existing["sleep_deep_min"],
+        "sleep_rem_min": existing["sleep_rem_min"],
+        "sleep_awake_min": existing["sleep_awake_min"],
         "well_being": well_being,
         "alco": alco
     }
@@ -220,8 +261,10 @@ async def save(request: Request,
 
     if success:
         set_note_cache(date, note_content)
+        logger.info(f"✅ /save: note for {date} saved successfully")
         return RedirectResponse(url=f"/?date={date}", status_code=status.HTTP_302_FOUND)
     else:
+        logger.error(f"❌ /save: failed to save note for {date} to Obsidian")
         return HTMLResponse(
             content=f"<h2>Ошибка сохранения в Obsidian</h2><p><a href='/?date={date}'>Назад</a></p>",
             status_code=500
@@ -237,7 +280,11 @@ async def sync_endpoint(request: Request,
                pulse_avg_day: int = Form(0),
                pulse_avg_sleep: int = Form(0),
                steps_1: int = Form(0),
-               steps_2: int = Form(0)):
+               steps_2: int = Form(0),
+               sleep_light_min: int = Form(0),
+               sleep_deep_min: int = Form(0),
+               sleep_rem_min: int = Form(0),
+               sleep_awake_min: int = Form(0)):
     """Automatic periodic sync from the Android app.
 
     Unlike /save (manual form save, full overwrite), this endpoint MERGES with
@@ -248,6 +295,10 @@ async def sync_endpoint(request: Request,
     - `sleep_hours` is "fill-once": only written when the existing value is 0,
       and only with a non-zero incoming value. Once a real value is recorded,
       sync will never overwrite it again (can't "re-measure" sleep mid-day).
+      The sleep-phase breakdown (`sleep_light_min`/`sleep_deep_min`/
+      `sleep_rem_min`/`sleep_awake_min`) shares this fill-once gate — they're
+      derived from the same Health Connect sleep session as `sleep_hours`,
+      so they fill together and freeze together.
     - `steps_1`, `steps_2` (and derived `steps_total`) are ALWAYS updated —
       they accumulate throughout the day and should reflect current totals.
     - `pulse_avg_day` / `pulse_avg_sleep` are NOT fill-once: they reflect
@@ -273,9 +324,14 @@ async def sync_endpoint(request: Request,
     if request.cookies.get("session_pin") != APP_PIN:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    logger.info(f"/sync called for {date}: sleep={sleep_hours}h, pulse_day={pulse_avg_day}, "
+                f"pulse_sleep={pulse_avg_sleep}, steps={steps_1}, "
+                f"phases(L/D/R/A)={sleep_light_min}/{sleep_deep_min}/{sleep_rem_min}/{sleep_awake_min}min")
+
     try:
         content = obsidian.get_note_content(date)
     except ObsidianFetchError as e:
+        logger.error(f"❌ /sync: cannot read current state for {date}, aborting: {e}")
         raise HTTPException(
             status_code=502,
             detail=f"Cannot verify current note state for {date}, aborting sync to avoid data loss: {e}"
@@ -283,8 +339,14 @@ async def sync_endpoint(request: Request,
 
     existing = parse_note(content)
 
-    # sleep_hours: fill-once (can't "remeasure" sleep mid-day)
-    final_sleep_hours = existing["sleep_hours"] if existing["sleep_hours"] else round(sleep_hours, 1)
+    # sleep_hours (and phase breakdown) share one fill-once gate:
+    # can't "remeasure" a night's sleep mid-day.
+    should_fill_sleep = not existing["sleep_hours"]
+    final_sleep_hours = round(sleep_hours, 1) if should_fill_sleep else existing["sleep_hours"]
+    final_sleep_light_min = sleep_light_min if should_fill_sleep else existing["sleep_light_min"]
+    final_sleep_deep_min = sleep_deep_min if should_fill_sleep else existing["sleep_deep_min"]
+    final_sleep_rem_min = sleep_rem_min if should_fill_sleep else existing["sleep_rem_min"]
+    final_sleep_awake_min = sleep_awake_min if should_fill_sleep else existing["sleep_awake_min"]
 
     # steps: ALWAYS update (accumulate throughout the day)
     final_steps_1 = steps_1
@@ -304,6 +366,10 @@ async def sync_endpoint(request: Request,
         "steps_1": final_steps_1,
         "steps_2": final_steps_2,
         "steps_total": steps_total,
+        "sleep_light_min": final_sleep_light_min,
+        "sleep_deep_min": final_sleep_deep_min,
+        "sleep_rem_min": final_sleep_rem_min,
+        "sleep_awake_min": final_sleep_awake_min,
         "well_being": well_being,
         "alco": existing["alco"]
     }
@@ -315,6 +381,9 @@ async def sync_endpoint(request: Request,
 
     if success:
         set_note_cache(date, note_content)
+        logger.info(f"✅ /sync: note for {date} saved (steps_total={steps_total}, "
+                    f"sleep={final_sleep_hours}h{' [filled]' if should_fill_sleep else ' [preserved]'})")
         return JSONResponse({"status": "ok", "date": date})
     else:
+        logger.error(f"❌ /sync: failed to save note for {date} to Obsidian")
         raise HTTPException(status_code=502, detail=f"Failed to save note in Obsidian for {date}")
