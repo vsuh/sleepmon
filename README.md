@@ -10,7 +10,7 @@
 
 ```
 ┌─────────────────┐        Health Connect       ┌──────────────────────┐
-│  Xiaomi Mi Band │ ───────────────────────────▶│  Android Companion   │
+│  Xiaomi Mi Band │ ──────────────────────────▶│  Android Companion   │
 │ (via Mi Fitness)│                             │  App (шаги/пульс/сон)│
 └─────────────────┘                             └──────────┬───────────┘
                                                            │ POST /sync
@@ -20,7 +20,7 @@
 │                        Docker Compose (сервер HRLOR)                 │
 │                                                                      │
 │  ┌─────────────────────┐   Local REST API    ┌────────────────────┐  │
-│  │  obsidian           │◀────HTTPS:27124────▶│  app (FastAPI)     │  │
+│  │  obsidian           │────HTTPS:27124────▶│  app (FastAPI)     │  │
 │  │  sytone/obsidian-   │                     │  :8000             │  │
 │  │  remote (headless,  │                     └────────────────────┘  │
 │  │  Xvfb + noVNC :8080)│                                             │
