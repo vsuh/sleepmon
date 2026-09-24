@@ -130,7 +130,7 @@ class XiaomiBandClassicConnection(
         private val sppOperationMutex = Mutex()
 
         suspend fun <T> withExclusiveSppOperation(block: suspend () -> T): T =
-            sppOperationMutex.withLock(block)
+            sppOperationMutex.withLock { block() }
     }
 
     /**
