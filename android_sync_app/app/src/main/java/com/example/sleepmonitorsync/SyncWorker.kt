@@ -2,15 +2,15 @@ package com.example.sleepmonitorsync
 
 import android.content.Context
 import android.util.Log
-import androidx.health.connect.client.HealthConnectClient
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.example.sleepmonitorsync.band.BandCredentials
 
 class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
     CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
-        Log.i("SyncWorker", "Starting background sync")
+        Log.i("SyncWorker", "Starting Xiaomi band background sync")
 
         val prefs = applicationContext.getSharedPreferences("prefs", Context.MODE_PRIVATE)
         val primaryUrl = prefs.getString("serverUrl", "") ?: ""
@@ -18,24 +18,31 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
         val pin = prefs.getString("appPin", "") ?: ""
 
         if (primaryUrl.isEmpty() || pin.isEmpty()) {
-            Log.w("SyncWorker", "URL or PIN is empty. Aborting.")
+            Log.w("SyncWorker", "Server URL or PIN is empty. Aborting.")
             return Result.failure()
         }
 
-        val client = HealthConnectClient.getOrCreate(applicationContext)
-
-        var isSuccess = true
-
-        // Sync today + yesterday every hour: cheap, and catches sleep sessions
-        // that only settle in Health Connect after waking up.
-        // SyncHelper logs each status under the "SyncHelper" tag itself, so we
-        // only need to check the outcome here.
-        SyncHelper.performSync(client, primaryUrl, backupUrl, pin, 1) { status ->
-            if (status.startsWith("Error")) {
-                isSuccess = false
-            }
+        val credentials = BandCredentials.load(applicationContext)
+        val authKey = credentials.authKeyHex.trim().removePrefix("0x").removePrefix("0X")
+        if (authKey.length != 32 || authKey.any { it.digitToIntOrNull(16) == null }) {
+            Log.w("SyncWorker", "Xiaomi auth key is not configured. Waiting for user to enter it in Settings.")
+            return Result.failure()
         }
 
-        return if (isSuccess) Result.success() else Result.retry()
+        val success = SyncHelper.performBandSync(
+            applicationContext,
+            primaryUrl,
+            backupUrl,
+            pin
+        ) { status ->
+            Log.i("SyncWorker", status)
+        }
+
+        return if (success) {
+            Result.success()
+        } else {
+            // WorkManager will retry transient Bluetooth/network/server failures.
+            Result.retry()
+        }
     }
 }
