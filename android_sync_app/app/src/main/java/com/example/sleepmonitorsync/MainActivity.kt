@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v17 (24.09.2026) - Xiaomi Band → backend с повторной доставкой"
+        const val APP_BUILD_TAG = "v18 (24.09.2026) - Xiaomi Band: пробуждения вместо фаз сна"
     }
 
     private val permissions = setOf(
