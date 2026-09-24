@@ -15,6 +15,8 @@ import com.example.sleepmonitorsync.band.activity.DailySummaryParser
 import com.example.sleepmonitorsync.band.activity.XiaomiActivityFileId
 import com.example.sleepmonitorsync.band.proto.XiaomiProto
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
@@ -121,6 +123,14 @@ class XiaomiBandClassicConnection(
         private const val FETCH_IDLE_TIMEOUT_MS = 15_000L
         /** Overall cap on a single fetchActivityData() call. */
         private const val FETCH_OVERALL_TIMEOUT_MS = 60_000L
+
+        // The Mi Band supports only one Classic SPP session reliably. Serialize every
+        // operation in this process, including manual debug actions, so a second socket
+        // cannot invalidate the first connection while it is uploading/ACKing files.
+        private val sppOperationMutex = Mutex()
+
+        suspend fun <T> withExclusiveSppOperation(block: suspend () -> T): T =
+            sppOperationMutex.withLock(block)
     }
 
     /**
