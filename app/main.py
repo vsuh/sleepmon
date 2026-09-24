@@ -76,9 +76,6 @@ def parse_note(content: str | None) -> dict:
         "sleep_hours": 0,
         "steps_1": 0,
         "steps_2": 0,
-        "sleep_light_min": 0,
-        "sleep_deep_min": 0,
-        "sleep_rem_min": 0,
         "sleep_awakenings": 0,
     }
     if content and content.startswith("---"):
@@ -91,9 +88,6 @@ def parse_note(content: str | None) -> dict:
             result["sleep_hours"] = frontmatter.get("sleep_hours", 0)
             result["steps_1"] = frontmatter.get("steps_1", 0)
             result["steps_2"] = frontmatter.get("steps_2", 0)
-            result["sleep_light_min"] = frontmatter.get("sleep_light_min", 0)
-            result["sleep_deep_min"] = frontmatter.get("sleep_deep_min", 0)
-            result["sleep_rem_min"] = frontmatter.get("sleep_rem_min", 0)
             result["sleep_awakenings"] = frontmatter.get("sleep_awakenings", 0)
     return result
 
@@ -246,9 +240,6 @@ async def save(request: Request,
         "steps_1": steps_1,
         "steps_2": steps_2,
         "steps_total": steps_total,
-        "sleep_light_min": existing["sleep_light_min"],
-        "sleep_deep_min": existing["sleep_deep_min"],
-        "sleep_rem_min": existing["sleep_rem_min"],
         "sleep_awakenings": existing["sleep_awakenings"],
         "well_being": well_being,
         "alco": alco
@@ -281,9 +272,6 @@ async def sync_endpoint(request: Request,
                pulse_avg_sleep: int = Form(0),
                steps_1: int = Form(0),
                steps_2: int = Form(0),
-               sleep_light_min: int = Form(0),
-               sleep_deep_min: int = Form(0),
-               sleep_rem_min: int = Form(0),
                sleep_awakenings: int = Form(0)):
     """Automatic periodic sync from the Android app.
 
@@ -361,9 +349,6 @@ async def sync_endpoint(request: Request,
         "steps_1": final_steps_1,
         "steps_2": final_steps_2,
         "steps_total": steps_total,
-        "sleep_light_min": final_sleep_light_min,
-        "sleep_deep_min": final_sleep_deep_min,
-        "sleep_rem_min": final_sleep_rem_min,
         "sleep_awakenings": final_sleep_awakenings,
         "well_being": well_being,
         "alco": existing["alco"]
