@@ -15,8 +15,129 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
+import com.example.sleepmonitorsync.band.BandCredentials
+import com.example.sleepmonitorsync.band.XiaomiBandClassicConnection
+import com.example.sleepmonitorsync.band.activity.ActivitySample
+import java.time.Instant
 
 object SyncHelper {
+    /**
+     * Fetches accumulated activity directly from the Xiaomi band over Classic SPP and
+     * uploads the decoded daily aggregates to /sync.
+     *
+     * The band is the source of truth for steps/heart-rate in the new pipeline.
+     * Sleep and sleep phases remain zero here until the corresponding Xiaomi activity
+     * file types are reverse-engineered; the backend fill-once merge keeps any
+     * already recorded sleep values intact.
+     */
+    suspend fun performBandSync(
+        context: android.content.Context,
+        primaryUrl: String,
+        backupUrl: String,
+        pin: String,
+        onStatus: (String) -> Unit
+    ): Boolean {
+        val credentials = BandCredentials.load(context)
+        val authKey = credentials.authKeyHex.trim().removePrefix("0x").removePrefix("0X")
+        if (authKey.length != 32 || authKey.any { it.digitToIntOrNull(16) == null }) {
+            val msg = "⚠️ Xiaomi auth key не задан. Откройте Настройки → Xiaomi Band и введите 32 hex-символа."
+            Log.w(TAG, msg)
+            onStatus(msg)
+            return false
+        }
+
+        val connection = XiaomiBandClassicConnection(context, credentials)
+        try {
+            onStatus("🔗 Подключаюсь к Xiaomi Band...")
+            val auth = connection.authenticate()
+            if (auth.isFailure) {
+                val msg = "❌ Xiaomi auth: ${auth.exceptionOrNull()?.message}"
+                Log.e(TAG, msg, auth.exceptionOrNull())
+                onStatus(msg)
+                return false
+            }
+
+            onStatus("📥 Загружаю накопившиеся данные с браслета...")
+            val fetch = connection.fetchActivityData()
+            if (fetch.isFailure) {
+                val msg = "❌ Xiaomi fetch: ${fetch.exceptionOrNull()?.message}"
+                Log.e(TAG, msg, fetch.exceptionOrNull())
+                onStatus(msg)
+                return false
+            }
+
+            val result = fetch.getOrThrow()
+            onStatus("📊 Получено файлов: ${result.filesReceived}, минутных записей: ${result.perMinuteSamples.size}")
+
+            val days = aggregateBandSamples(result.perMinuteSamples, result.dailySummaries)
+            if (days.isEmpty()) {
+                onStatus("ℹ️ Браслет не вернул новых распознанных данных")
+                return true
+            }
+
+            val (activeUrl, cookie) = resolveActiveServer(primaryUrl, backupUrl, pin, onStatus)
+            for (day in days.sortedBy { it.date }) {
+                postToServer(activeUrl, cookie, day.date.toString(), day.sleepHours, day.pulseAvgDay,
+                    day.pulseAvgSleep, day.steps1, day.steps2, day.sleepLightMin, day.sleepDeepMin,
+                    day.sleepRemMin, day.sleepAwakeMin)
+                onStatus("✅ ${day.date}: шаги ${day.steps1 + day.steps2}, пульс ${day.pulseAvgDay}")
+            }
+
+            onStatus("═══ Xiaomi sync завершён: ${days.size} дн.")
+            return true
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Xiaomi sync failed: ${e.message}", e)
+            onStatus("❌ Xiaomi sync: ${e.localizedMessage}")
+            return false
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private data class BandDayAggregate(
+        val date: LocalDate,
+        val steps1: Int,
+        val steps2: Int,
+        val pulseAvgDay: Int,
+        val pulseAvgSleep: Int = 0,
+        val sleepHours: Double = 0.0,
+        val sleepLightMin: Int = 0,
+        val sleepDeepMin: Int = 0,
+        val sleepRemMin: Int = 0,
+        val sleepAwakeMin: Int = 0,
+    )
+
+    private fun aggregateBandSamples(
+        samples: List<ActivitySample>,
+        summaries: List<com.example.sleepmonitorsync.band.activity.DailySummary>
+    ): List<BandDayAggregate> {
+        val unique = samples.groupBy { it.timestampSeconds }
+            .mapValues { (_, sameMinute) ->
+                sameMinute.firstOrNull { it.steps != null || it.heartRate != null } ?: sameMinute.first()
+            }
+            .values
+
+        val byDay = unique.groupBy {
+            Instant.ofEpochSecond(it.timestampSeconds.toLong()).atZone(ZoneId.systemDefault()).toLocalDate()
+        }
+        val summaryByDay = summaries.associateBy {
+            Instant.ofEpochSecond(it.timestampSeconds.toLong()).atZone(ZoneId.systemDefault()).toLocalDate()
+        }
+
+        return byDay.map { (date, daySamples) ->
+            val firstHalfSteps = daySamples.filter {
+                Instant.ofEpochSecond(it.timestampSeconds.toLong()).atZone(ZoneId.systemDefault()).hour < 12
+            }.sumOf { it.steps ?: 0 }
+            val secondHalfSteps = daySamples.filter {
+                Instant.ofEpochSecond(it.timestampSeconds.toLong()).atZone(ZoneId.systemDefault()).hour >= 12
+            }.sumOf { it.steps ?: 0 }
+            val hr = daySamples.mapNotNull { it.heartRate?.takeIf { bpm -> bpm > 0 } }
+            val summary = summaryByDay[date]
+            val pulse = if (hr.isNotEmpty()) hr.average().toInt() else (summary?.hrAvg ?: 0)
+
+            BandDayAggregate(date = date, steps1 = firstHalfSteps, steps2 = secondHalfSteps, pulseAvgDay = pulse)
+        }
+    }
     private const val TAG = "SyncHelper"
     private const val FALLBACK_TIMEOUT_SECONDS = 5L
 
