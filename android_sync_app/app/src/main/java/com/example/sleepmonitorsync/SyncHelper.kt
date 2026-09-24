@@ -18,7 +18,6 @@ import java.util.concurrent.TimeUnit
 import com.example.sleepmonitorsync.band.BandCredentials
 import com.example.sleepmonitorsync.band.XiaomiBandClassicConnection
 import com.example.sleepmonitorsync.band.activity.ActivitySample
-import java.time.Instant
 
 object SyncHelper {
     /**
