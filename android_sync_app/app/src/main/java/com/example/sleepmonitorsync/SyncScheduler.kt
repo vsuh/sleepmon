@@ -10,13 +10,13 @@ import java.util.concurrent.TimeUnit
  * Centralizes scheduling of the background sync (WorkManager periodic work).
  * Called on app start and after device boot so sync keeps running even when
  * the app UI is closed/killed.
- * 
- * NOTE: Minimum interval for WorkManager periodic work is 15 minutes on some devices,
- * but we request 5 minutes as a hint. Android will use the closest interval it supports.
+ *
+ * WorkManager has a platform minimum for periodic work; we request a 60-minute
+ * interval, matching the user-facing text in MainActivity.
  */
 object SyncScheduler {
     private const val WORK_NAME = "SleepMonitorSync"
-    private const val SYNC_INTERVAL_MINUTES = 5
+    private const val SYNC_INTERVAL_MINUTES = 60
 
     fun schedule(context: Context) {
         val syncWorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(
