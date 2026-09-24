@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v19 (24.09.2026) - sleep awakenings в Xiaomi/Health Connect sync"
+        const val APP_BUILD_TAG = "v20 (24.09.2026) - проверка подключения в Настройках"
     }
 
     private val permissions = setOf(
@@ -180,6 +180,11 @@ class MainActivity : ComponentActivity() {
                     onServerUrlBackupChange = { serverUrlBackup = it; prefs.edit().putString("serverUrlBackup", it).apply() },
                     appPin = appPin,
                     onAppPinChange = { appPin = it; prefs.edit().putString("appPin", it).apply() },
+                    onCheckConnection = {
+                        requestAndRunBandTest { XiaomiBandTester.testAuthSpp(context) }
+                    },
+                    bleRunning = bleRunning,
+                    bleStatus = bleStatus,
                     onBack = { showSettings = false },
                 )
                 return@setContent
@@ -266,24 +271,13 @@ class MainActivity : ComponentActivity() {
                 Spacer(modifier = Modifier.height(32.dp))
                 Text("Xiaomi Band (debug)")
                 Spacer(modifier = Modifier.height(8.dp))
-                Row {
-                    Button(
-                        enabled = !bleRunning,
-                        onClick = {
-                            requestAndRunBandTest { XiaomiBandTester.testAuthSpp(context) }
-                        }
-                    ) {
-                        Text(if (bleRunning) "..." else "Проверить подключение")
+                Button(
+                    enabled = !bleRunning,
+                    onClick = {
+                        requestAndRunBandTest { XiaomiBandTester.testActivityFetch(context) }
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        enabled = !bleRunning,
-                        onClick = {
-                            requestAndRunBandTest { XiaomiBandTester.testActivityFetch(context) }
-                        }
-                    ) {
-                        Text(if (bleRunning) "..." else "Загрузить данные")
-                    }
+                ) {
+                    Text(if (bleRunning) "..." else "Загрузить данные")
                 }
                 if (bleStatus.isNotBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -319,6 +313,9 @@ private fun SettingsScreen(
     onServerUrlBackupChange: (String) -> Unit,
     appPin: String,
     onAppPinChange: (String) -> Unit,
+    onCheckConnection: () -> Unit,
+    bleRunning: Boolean,
+    bleStatus: String,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -376,6 +373,17 @@ private fun SettingsScreen(
                 "переизвлеките его через xiaomi-extractor и вставьте сюда, без пересборки приложения.",
             style = MaterialTheme.typography.bodySmall,
         )
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(
+            enabled = !bleRunning,
+            onClick = onCheckConnection,
+        ) {
+            Text(if (bleRunning) "..." else "Проверить подключение")
+        }
+        if (bleStatus.isNotBlank()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(bleStatus)
+        }
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = bandMac,
