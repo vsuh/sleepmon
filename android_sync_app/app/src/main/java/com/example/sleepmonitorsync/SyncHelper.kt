@@ -44,7 +44,7 @@ object SyncHelper {
             val msg = "⚠️ Xiaomi auth key не задан. Откройте Настройки → Xiaomi Band и введите 32 hex-символа."
             Log.w(TAG, msg)
             onStatus(msg)
-            return false
+            return@withExclusiveSppOperation false
         }
 
         val connection = XiaomiBandClassicConnection(context, credentials)
@@ -55,7 +55,7 @@ object SyncHelper {
                 val msg = "❌ Xiaomi auth: ${auth.exceptionOrNull()?.message}"
                 Log.e(TAG, msg, auth.exceptionOrNull())
                 onStatus(msg)
-                return false
+                return@withExclusiveSppOperation false
             }
 
             onStatus("📥 Загружаю накопившиеся данные с браслета...")
@@ -64,7 +64,7 @@ object SyncHelper {
                 val msg = "❌ Xiaomi fetch: ${fetch.exceptionOrNull()?.message}"
                 Log.e(TAG, msg, fetch.exceptionOrNull())
                 onStatus(msg)
-                return false
+                return@withExclusiveSppOperation false
             }
 
             val result = fetch.getOrThrow()
@@ -73,7 +73,7 @@ object SyncHelper {
             val days = aggregateBandSamples(result.perMinuteSamples, result.dailySummaries)
             if (days.isEmpty()) {
                 onStatus("ℹ️ Браслет не вернул новых распознанных данных")
-                return true
+                return@withExclusiveSppOperation true
             }
 
             val (activeUrl, cookie) = resolveActiveServer(primaryUrl, backupUrl, pin, onStatus)
@@ -85,15 +85,15 @@ object SyncHelper {
 
             if (!connection.acknowledgeFetchedFiles()) {
                 onStatus("⚠️ Данные загружены, но подтверждение файлов браслету не удалось; они будут предложены повторно.")
-                return false
+                return@withExclusiveSppOperation false
             }
 
             onStatus("═══ Xiaomi sync завершён: ${days.size} дн.")
-            return true
+            return@withExclusiveSppOperation true
         } catch (e: Exception) {
             Log.e(TAG, "❌ Xiaomi sync failed: ${e.message}", e)
             onStatus("❌ Xiaomi sync: ${e.localizedMessage}")
-            return false
+            return@withExclusiveSppOperation false
         } finally {
             connection.disconnect()
             }
