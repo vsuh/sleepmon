@@ -77,8 +77,7 @@ object SyncHelper {
             val (activeUrl, cookie) = resolveActiveServer(primaryUrl, backupUrl, pin, onStatus)
             for (day in days.sortedBy { it.date }) {
                 postToServer(activeUrl, cookie, day.date.toString(), day.sleepHours, day.pulseAvgDay,
-                    day.pulseAvgSleep, day.steps1, day.steps2, day.sleepLightMin, day.sleepDeepMin,
-                    day.sleepRemMin, day.sleepAwakeMin)
+                    day.pulseAvgSleep, day.steps1, day.steps2, day.sleepAwakenings)
                 onStatus("✅ ${day.date}: шаги ${day.steps1 + day.steps2}, пульс ${day.pulseAvgDay}")
             }
 
@@ -105,10 +104,7 @@ object SyncHelper {
         val pulseAvgDay: Int,
         val pulseAvgSleep: Int = 0,
         val sleepHours: Double = 0.0,
-        val sleepLightMin: Int = 0,
-        val sleepDeepMin: Int = 0,
-        val sleepRemMin: Int = 0,
-        val sleepAwakeMin: Int = 0,
+        val sleepAwakenings: Int = 0,
     )
 
     private fun aggregateBandSamples(
@@ -438,11 +434,9 @@ object SyncHelper {
         sleep: Double,
         hrDay: Int,
         hrSleep: Int,
-        steps: Int,
-        sleepLightMin: Int,
-        sleepDeepMin: Int,
-        sleepRemMin: Int,
-        sleepAwakeMin: Int
+        steps1: Int,
+        steps2: Int,
+        sleepAwakenings: Int
     ) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
@@ -457,12 +451,9 @@ object SyncHelper {
                     .add("sleep_hours", sleep.toString())
                     .add("pulse_avg_day", hrDay.toString())
                     .add("pulse_avg_sleep", hrSleep.toString())
-                    .add("steps_1", steps.toString())
-                    .add("steps_2", "0")
-                    .add("sleep_light_min", sleepLightMin.toString())
-                    .add("sleep_deep_min", sleepDeepMin.toString())
-                    .add("sleep_rem_min", sleepRemMin.toString())
-                    .add("sleep_awake_min", sleepAwakeMin.toString())
+                    .add("steps_1", steps1.toString())
+                    .add("steps_2", steps2.toString())
+                    .add("sleep_awakenings", sleepAwakenings.toString())
                     .build()
 
                 val syncReq = Request.Builder()
