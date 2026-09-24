@@ -12,6 +12,12 @@ import androidx.navigation3.runtime.NavKey
 import com.example.sleepmonitorsync.data.DefaultDataRepository
 import com.example.sleepmonitorsync.theme.SleepMonitorSyncTheme
 
+// NOTE: this file is scaffold/template code, not wired into MainActivity's actual
+// setContent { } (see MainActivity.kt) - it's not part of the app's real UI. The
+// Xiaomi Band debug buttons live in MainActivity.kt instead. Kept here only because
+// removing it isn't part of the current task; do not add band-testing code here again,
+// it won't be reachable from the running app.
+
 @Composable
 fun MainScreen(
   onItemClick: (NavKey) -> Unit,
@@ -34,7 +40,9 @@ fun MainScreen(
 
 @Composable
 internal fun MainScreen(data: List<String>, modifier: Modifier = Modifier) {
-  Column(modifier) { data.forEach { Greeting(it) } }
+  Column(modifier) {
+    data.forEach { Greeting(it) }
+  }
 }
 
 @Composable

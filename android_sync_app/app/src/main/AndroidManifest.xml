@@ -13,6 +13,19 @@
     <uses-permission android:name="android.permission.health.READ_SLEEP"/>
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"/>
 
+    <!-- Xiaomi BLE/Classic band (com.example.sleepmonitorsync.band): we connect
+         directly by a known MAC address, not via BLE scan, so ACCESS_FINE_LOCATION is
+         not needed (neverForLocation below). BLUETOOTH_SCAN is still required on API
+         31+ purely because BluetoothAdapter.cancelDiscovery() is classified as a scan
+         operation by the platform, even though we never call startDiscovery().
+         BLUETOOTH_CONNECT covers API 31+; the legacy BLUETOOTH/BLUETOOTH_ADMIN
+         permissions cover API 28-30 (minSdk is 28). -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+
     <application
         android:name=".SleepMonitorApp"
         android:usesCleartextTraffic="true"

@@ -1,0 +1,72 @@
+// Protocol schema for Xiaomi/Zepp "miwear" BLE devices - TRIMMED to the auth-handshake
+// messages actually used in Этап A, matching what's checked in at
+// app/src/main/java/com/example/sleepmonitorsync/band/proto/XiaomiProto.java.
+//
+// This file is NOT compiled by Gradle (see build.gradle.kts note - the
+// com.google.protobuf plugin is currently incompatible with AGP 9.x). It's kept here as
+// the source of truth for regenerating XiaomiProto.java by hand:
+//   protoc --java_out=lite:<out_dir> app/src/main/proto/xiaomi_auth_only.proto
+// (any protoc 3.25.x binary works, no plugin needed - a Java code generator is built
+// into protoc itself).
+//
+// The full upstream schema (all commands: system, health/activity, calendar, music,
+// notifications, weather, schedule, watchface, data upload) lives alongside this file
+// as xiaomi.proto, for reference. When Этап B needs Health/activity messages, copy the
+// relevant message definitions from xiaomi.proto into this file and regenerate.
+//
+// Ported from the Gadgetbridge project (https://codeberg.org/Freeyourgadget/Gadgetbridge,
+// AGPLv3). Original copyright (C) 2023-2024 José Rebelo and Gadgetbridge contributors.
+
+syntax = "proto2";
+
+package xiaomi;
+
+option java_package = "com.example.sleepmonitorsync.band.proto";
+option java_outer_classname = "XiaomiProto";
+
+message Command {
+  required uint32 type = 1;
+  optional uint32 subtype = 2;
+
+  optional Auth auth = 3;
+
+  optional uint32 status = 100; // 0 on success on some
+}
+
+message Auth {
+  optional string userId = 7;
+  optional uint32 status = 8;
+  // 1, 26
+  optional PhoneNonce phoneNonce = 30;
+  optional WatchNonce watchNonce = 31;
+  // 1, 27
+  optional AuthStep3 authStep3 = 32;
+  optional AuthStep4 authStep4 = 33;
+}
+
+message PhoneNonce {
+  required bytes nonce = 1;
+}
+
+message WatchNonce {
+  required bytes nonce = 1;
+  required bytes hmac = 2;
+}
+
+message AuthStep3 {
+  required bytes encryptedNonces = 1;
+  required bytes encryptedDeviceInfo = 2;  // AuthDeviceInfo
+}
+
+message AuthStep4 {
+  required uint32 unknown1 = 1;
+  optional uint32 unknown2 = 2;
+}
+
+message AuthDeviceInfo {
+  required uint32 unknown1 = 1; // 0 - needs to be serialized explicitly
+  required float phoneApiLevel = 2;
+  required string phoneName = 3; // phone model
+  required uint32 unknown3 = 4; // 224
+  required string region = 5; // 2-letter, upper case
+}

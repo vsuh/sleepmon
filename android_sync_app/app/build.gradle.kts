@@ -43,6 +43,17 @@ kotlin {
     jvmToolchain(17)
 }
 
+// Xiaomi BLE band protocol (com.example.sleepmonitorsync.band): the .proto schema
+// (app/src/main/proto/xiaomi.proto - full, for reference/Этап B - and
+// xiaomi_auth_only.proto - the trimmed subset actually used right now) is NOT compiled
+// by a Gradle protobuf plugin. The com.google.protobuf Gradle plugin is currently
+// incompatible with AGP 9.x (unresolved upstream bug:
+// https://github.com/google/protobuf-gradle-plugin/issues/787). Instead,
+// XiaomiProto.java was pre-generated once with a standalone `protoc --java_out=lite`
+// and is checked in directly at
+// app/src/main/java/com/example/sleepmonitorsync/band/proto/XiaomiProto.java.
+// Regenerate it manually with protoc (no Gradle plugin needed) if the .proto changes.
+
 dependencies {
   val composeBom = platform(libs.androidx.compose.bom)
   implementation(composeBom)
@@ -82,15 +93,29 @@ dependencies {
   implementation(libs.androidx.navigation3.runtime)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 
-  // Health Connect
+  // Health Connect (legacy data source, kept in parallel with the direct BLE
+  // path during the transition - see 10-projects/sleep-monitor/task.md Этап E)
   implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
-  
+
   // HTTP Client
   implementation("com.squareup.okhttp3:okhttp:4.12.0")
-  
+
   // JSON
   implementation("org.json:json:20231013")
-  
+
   // WorkManager
   implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+  // Coroutines (explicit, used directly by the BLE band module for
+  // suspend-based GATT orchestration)
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+  // Xiaomi BLE band protocol: protobuf-lite runtime for the pre-generated
+  // XiaomiProto classes (see note above - no Gradle protobuf plugin).
+  implementation("com.google.protobuf:protobuf-javalite:3.25.3")
+
+  // Xiaomi BLE band protocol: AES-CCM (auth handshake + per-packet encryption).
+  // Android's built-in javax.crypto AES/CCM support is inconsistent across OEMs/API
+  // levels, so we use Bouncy Castle directly - same approach as Gadgetbridge.
+  implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
 }
