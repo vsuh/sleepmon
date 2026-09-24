@@ -52,7 +52,7 @@ object XiaomiBandTester {
             if (authResult.isFailure) {
                 val e = authResult.exceptionOrNull()
                 Log.e(TAG, "❌ Auth failed", e)
-                return "❌ Auth: ${e?.message}"
+                return@withExclusiveSppOperation "❌ Auth: ${e?.message}"
             }
             Log.i(TAG, "✅ Auth ok, requesting activity data...")
             val fetchResult = connection.fetchActivityData()
