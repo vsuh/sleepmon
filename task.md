@@ -450,3 +450,6 @@ SyncWorker теперь использует performBandSync() вместо Heal
 ### Кнопка Sync Now переведена на Xiaomi (build v16, 2026-09-24)
 
 Главная кнопка Sync Now теперь запускает performBandSync() напрямую и больше не требует разрешений Health Connect. Старый Health Connect путь оставлен для Sync Range/backfill до отдельного решения по его судьбе.
+
+
+Мелкая корректировка после интеграции: удалён дублирующий import java.time.Instant из SyncHelper; функциональность не менялась.
