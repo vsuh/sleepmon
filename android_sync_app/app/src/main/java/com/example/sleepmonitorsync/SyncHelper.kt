@@ -385,7 +385,7 @@ object SyncHelper {
                 "sleep=$sleepHours h, awakenings=$sleepAwakenings")
         postToServer(
             url, cookie, targetDay.toString(), sleepHours, hrDayAvg.toInt(), hrSleepAvg.toInt(),
-            totalSteps.toInt(), 0, 0, sleepAwakenings
+            totalSteps.toInt(), 0, sleepAwakenings
         )
     }
 
