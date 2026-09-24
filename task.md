@@ -489,3 +489,8 @@ Health Connect legacy/backfill path также переведён с фаз сн
 
 
 Build tag повышен до v19 (24.09.2026) после перевода legacy Health Connect Sync Range на метрику количества пробуждений.
+
+
+### Исправлен compile blocker legacy Health Connect Sync Range (2026-09-24)
+
+После перевода модели сна на `sleep_awakenings` в legacy Health Connect вызове `postToServer()` оставался один лишний аргумент от старой схемы фаз сна. Вызов исправлен: теперь передаются `steps_1`, `steps_2` и `sleep_awakenings` строго в соответствии с актуальной сигнатурой `postToServer()`. Функциональная логика синхронизации не менялась — исправлена только несовместимость количества аргументов, блокировавшая компиляцию Android-приложения.
