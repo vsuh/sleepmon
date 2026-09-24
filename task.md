@@ -422,3 +422,8 @@ Auth key Xiaomi не является стабильным значением: �
 Проверен репозиторий `vsuh/sleepmon` на hardcoded credentials. `OBSIDIAN_API_KEY` в `.env.example` оставлен как тестовый placeholder (`your_local_rest_api_key_here`) — это не секрет. Реальный Obsidian API key должен находиться только в локальном `.env`, который уже исключён через `.gitignore`.
 
 Актуальный Xiaomi auth key удалён из `BandCredentials.kt` и из исторических записей `task.md`. После изменения `BandCredentials.kt` требуется пересборка APK; на существующей установке сохранённый в SharedPreferences ключ продолжит использоваться.
+
+
+### Проверка пустого Xiaomi auth key (2026-09-24)
+
+В `XiaomiBandClassicConnection.authenticate()` добавлена явная валидация auth key до попытки Bluetooth-подключения. Если ключ пустой или не является 32 hex-символами, подключение не начинается и приложение получает понятное сообщение с предложением открыть настройки и ввести ключ. Это устраняет прежнее молчаливое падение при пустом ключе.
