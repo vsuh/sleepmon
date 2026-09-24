@@ -486,3 +486,6 @@ Build tag обновлён до v18 (24.09.2026) — Android sync теперь �
 
 
 Health Connect legacy/backfill path также переведён с фаз сна на `sleep_awakenings`: считаются отдельные непрерывные эпизоды AWAKE/AWAKE_IN_BED/OUT_OF_BED внутри выбранной сессии сна. Это только legacy Sync Range; основной Xiaomi-путь пока ждёт reverse-engineering sleep-related файлов браслета.
+
+
+Build tag повышен до v19 (24.09.2026) после перевода legacy Health Connect Sync Range на метрику количества пробуждений.
