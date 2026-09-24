@@ -166,6 +166,10 @@ class XiaomiBandClassicConnection(
     // ============================== Auth ==============================
 
     suspend fun authenticate(): Result<Unit> {
+        val cleanAuthKey = credentials.authKeyHex.trim().removePrefix("0x").removePrefix("0X")
+        if (cleanAuthKey.length != 32 || cleanAuthKey.any { it.digitToIntOrNull(16) == null }) {
+            return Result.failure(IllegalStateException("Ключ авторизации браслета не задан. Откройте Настройки → Xiaomi Band и введите 32 hex-символа."))
+        }
         if (!hasBluetoothConnectPermission()) {
             return Result.failure(SecurityException("BLUETOOTH_CONNECT permission not granted"))
         }
