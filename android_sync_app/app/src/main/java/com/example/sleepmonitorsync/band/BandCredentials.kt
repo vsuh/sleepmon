@@ -41,16 +41,9 @@ data class BandCredentials(
 
         private const val DEFAULT_MAC = "D0:AE:05:11:3D:FE"
 
-        // Auth key history (most recent first) - see 10-projects/sleep-monitor/task.md:
-        //   2026-09-14: b267f926cfe511ef21f5beaa986e6715 - re-extracted after the
-        //     2026-08-29 key rotated (confirmed dead: verified offline against a real
-        //     HCI-captured Mi Fitness session, only this newer key reproduces the
-        //     device's real HMAC). Re-extract again if this one ever stops working -
-        //     re-pairing/relinking in Mi Fitness rotates it.
-        //   2026-08-29: c0bc3f6c7faaf56656fa5c6624fef35d - initial extraction, since
-        //     rotated (kept here only for history/debugging reference).
-        private const val DEFAULT_AUTH_KEY = "b267f926cfe511ef21f5beaa986e6715"
-
+        // No auth key is embedded in the APK. The key is entered in Settings and
+        // persisted in SharedPreferences because Xiaomi rotates/invalidates it when
+        // the band is unlinked/relinked in Mi Fitness.
         private fun prefs(context: Context): SharedPreferences =
             context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -58,7 +51,7 @@ data class BandCredentials(
             val p = prefs(context)
             return BandCredentials(
                 macAddress = p.getString(KEY_MAC, DEFAULT_MAC) ?: DEFAULT_MAC,
-                authKeyHex = p.getString(KEY_AUTH_KEY, DEFAULT_AUTH_KEY) ?: DEFAULT_AUTH_KEY,
+                authKeyHex = p.getString(KEY_AUTH_KEY, "") ?: "",
             )
         }
 
