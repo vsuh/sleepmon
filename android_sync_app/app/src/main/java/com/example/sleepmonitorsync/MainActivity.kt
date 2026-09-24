@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v21 (24.09.2026) - фоновая синхронизация раз в час"
+        const val APP_BUILD_TAG = "v22 (24.09.2026) - защита от параллельных SPP-сессий"
     }
 
     private val permissions = setOf(
