@@ -21,9 +21,10 @@ object XiaomiBandTester {
     suspend fun testAuthSpp(context: Context): String {
         val credentials = BandCredentials.load(context)
         Log.i(TAG, "═══ Testing Xiaomi band auth (SPP) against ${credentials.macAddress}")
-        val connection = XiaomiBandClassicConnection(context, credentials)
-        return try {
-            val result = connection.authenticate()
+        return XiaomiBandClassicConnection.withExclusiveSppOperation {
+            val connection = XiaomiBandClassicConnection(context, credentials)
+            try {
+                val result = connection.authenticate()
             result.fold(
                 onSuccess = {
                     Log.i(TAG, "✅ Auth succeeded")
@@ -34,8 +35,9 @@ object XiaomiBandTester {
                     "❌ Ошибка: ${e.message}"
                 },
             )
-        } finally {
-            connection.disconnect()
+            } finally {
+                connection.disconnect()
+            }
         }
     }
 
@@ -43,9 +45,10 @@ object XiaomiBandTester {
     suspend fun testActivityFetch(context: Context): String {
         val credentials = BandCredentials.load(context)
         Log.i(TAG, "═══ Testing activity fetch against ${credentials.macAddress}")
-        val connection = XiaomiBandClassicConnection(context, credentials)
-        return try {
-            val authResult = connection.authenticate()
+        return XiaomiBandClassicConnection.withExclusiveSppOperation {
+            val connection = XiaomiBandClassicConnection(context, credentials)
+            try {
+                val authResult = connection.authenticate()
             if (authResult.isFailure) {
                 val e = authResult.exceptionOrNull()
                 Log.e(TAG, "❌ Auth failed", e)
@@ -60,8 +63,9 @@ object XiaomiBandTester {
                     "❌ Fetch: ${e.message}"
                 },
             )
-        } finally {
-            connection.disconnect()
+            } finally {
+                connection.disconnect()
+            }
         }
     }
 
