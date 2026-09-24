@@ -82,6 +82,11 @@ object SyncHelper {
                 onStatus("✅ ${day.date}: шаги ${day.steps1 + day.steps2}, пульс ${day.pulseAvgDay}")
             }
 
+            if (!connection.acknowledgeFetchedFiles()) {
+                onStatus("⚠️ Данные загружены, но подтверждение файлов браслету не удалось; они будут предложены повторно.")
+                return false
+            }
+
             onStatus("═══ Xiaomi sync завершён: ${days.size} дн.")
             return true
         } catch (e: Exception) {
