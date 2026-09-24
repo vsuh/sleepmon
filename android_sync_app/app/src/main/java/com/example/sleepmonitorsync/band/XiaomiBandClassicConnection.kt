@@ -702,7 +702,10 @@ class XiaomiBandClassicConnection(
                                 .setActivitySyncAckFileIds(com.google.protobuf.ByteString.copyFrom(rawId))
                         )
                         .build()
-                    sendEncryptedProtobufCommand(sock, ackCmd)
+                    if (!sendEncryptedProtobufCommand(sock, ackCmd)) {
+                        Log.e(TAG, "❌ Failed to send ACK for activity file")
+                        return@withContext false
+                    }
                 }
                 pendingFileAcks.clear()
                 Log.i(TAG, "✅ Acknowledged ${ids.size} activity file(s) after backend upload")
@@ -714,8 +717,8 @@ class XiaomiBandClassicConnection(
         }
     }
     /** Post-auth Health/etc commands (type != 1) go out AES-CTR encrypted. */
-    private fun sendEncryptedProtobufCommand(sock: BluetoothSocket, command: XiaomiProto.Command) {
-        val material = authMaterial ?: return
+    private fun sendEncryptedProtobufCommand(sock: BluetoothSocket, command: XiaomiProto.Command): Boolean {
+        val material = authMaterial ?: return false
         val plain = command.toByteArray()
         val cipherBytes = XiaomiCrypto.ctrCryptV2(material.encryptionKey, plain)
         val dataPayload = ByteArray(2 + cipherBytes.size)
@@ -727,7 +730,7 @@ class XiaomiBandClassicConnection(
             sequenceNumber = outgoingSeq++,
             payload = dataPayload,
         )
-        writeRaw(sock, frame)
+        return writeRaw(sock, frame)
     }
 
     private fun sendAck(sock: BluetoothSocket, sequenceNumberToAck: Int) {
@@ -739,13 +742,15 @@ class XiaomiBandClassicConnection(
         writeRaw(sock, frame)
     }
 
-    private fun writeRaw(sock: BluetoothSocket, bytes: ByteArray) {
-        try {
+    private fun writeRaw(sock: BluetoothSocket, bytes: ByteArray): Boolean {
+        return try {
             val out: OutputStream = sock.outputStream
             out.write(bytes)
             out.flush()
+            true
         } catch (e: IOException) {
             Log.e(TAG, "SPP write failed: ${e.message}", e)
+            false
         }
     }
 }
