@@ -159,6 +159,7 @@ class XiaomiBandClassicConnection(
     private var filesFailed = 0
     private var filesUnsupported = 0
     private val unsupportedFileDescriptions = mutableListOf<String>()
+    private val pendingFileAcks = mutableListOf<ByteArray>()
     private var currentChunkBuffer = ByteArray(0)
     private var currentChunkTotal = 0
     private var fetchIdleDeferred: CompletableDeferred<Unit>? = null
@@ -517,6 +518,7 @@ class XiaomiBandClassicConnection(
         filesFailed = 0
         filesUnsupported = 0
         unsupportedFileDescriptions.clear()
+        pendingFileAcks.clear()
         currentChunkBuffer = ByteArray(0)
         currentChunkTotal = 0
 
@@ -652,18 +654,55 @@ class XiaomiBandClassicConnection(
             }
         }
 
-        // Ack this file regardless of parse outcome, so the band doesn't keep re-offering it forever.
-        val ackCmd = XiaomiProto.Command.newBuilder()
-            .setType(CMD_TYPE_HEALTH)
-            .setSubtype(HEALTH_SUBTYPE_ACK_FILE)
-            .setHealth(
-                XiaomiProto.Health.newBuilder()
-                    .setActivitySyncAckFileIds(com.google.protobuf.ByteString.copyFrom(fileId.raw))
-            )
-            .build()
-        sendEncryptedProtobufCommand(sock, ackCmd)
+        // Do NOT acknowledge the file yet. The caller must first persist/upload the
+        // decoded data successfully. If the backend is unavailable, closing the socket
+        // without an ACK makes the band offer the file again on the next sync instead of
+        // losing it after a successful Bluetooth transfer.
+        if (parsedOkForAck(fileId, isKnownCombo)) {
+            pendingFileAcks.add(fileId.raw)
+        }
     }
 
+    private fun parsedOkForAck(fileId: XiaomiActivityFileId, isKnownCombo: Boolean): Boolean {
+        if (!isKnownCombo) return false
+        return when (fileId.detailType) {
+            XiaomiActivityFileId.DETAIL_TYPE_DETAILS -> DailyDetailsParser.headerSizeForVersion(fileId.version) != null
+            XiaomiActivityFileId.DETAIL_TYPE_SUMMARY -> fileId.version == 5
+            else -> false
+        }
+    }
+
+    /**
+     * Acknowledge successfully decoded activity files after the caller has uploaded
+     * their data to the backend. Until this method is called, those files remain
+     * unacknowledged on the band and can be downloaded again on the next connection.
+     */
+    suspend fun acknowledgeFetchedFiles(): Boolean {
+        val sock = socket ?: return false
+        if (pendingFileAcks.isEmpty()) return true
+        return withContext(Dispatchers.IO) {
+            try {
+                val ids = pendingFileAcks.toList()
+                ids.forEach { rawId ->
+                    val ackCmd = XiaomiProto.Command.newBuilder()
+                        .setType(CMD_TYPE_HEALTH)
+                        .setSubtype(HEALTH_SUBTYPE_ACK_FILE)
+                        .setHealth(
+                            XiaomiProto.Health.newBuilder()
+                                .setActivitySyncAckFileIds(com.google.protobuf.ByteString.copyFrom(rawId))
+                        )
+                        .build()
+                    sendEncryptedProtobufCommand(sock, ackCmd)
+                }
+                pendingFileAcks.clear()
+                Log.i(TAG, "✅ Acknowledged ${ids.size} activity file(s) after backend upload")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to acknowledge activity files: ${e.message}", e)
+                false
+            }
+        }
+    }
     /** Post-auth Health/etc commands (type != 1) go out AES-CTR encrypted. */
     private fun sendEncryptedProtobufCommand(sock: BluetoothSocket, command: XiaomiProto.Command) {
         val material = authMaterial ?: return
