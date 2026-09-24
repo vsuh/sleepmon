@@ -483,3 +483,6 @@ Build tag обновлён до v17 (24.09.2026) — Xiaomi Band → backend с 
 
 
 Build tag обновлён до v18 (24.09.2026) — Android sync теперь передаёт количество пробуждений `sleep_awakenings` вместо фаз сна.
+
+
+Health Connect legacy/backfill path также переведён с фаз сна на `sleep_awakenings`: считаются отдельные непрерывные эпизоды AWAKE/AWAKE_IN_BED/OUT_OF_BED внутри выбранной сессии сна. Это только legacy Sync Range; основной Xiaomi-путь пока ждёт reverse-engineering sleep-related файлов браслета.
