@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v14 (20.09.2026) - копирование результата, различение unsupported/failed"
+        const val APP_BUILD_TAG = "v15 (24.09.2026) - ключ браслета не зашит в APK"
     }
 
     private val permissions = setOf(
