@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v15 (24.09.2026) - ключ браслета не зашит в APK"
+        const val APP_BUILD_TAG = "v16 (24.09.2026) - Xiaomi Band → backend"
     }
 
     private val permissions = setOf(
@@ -215,13 +215,9 @@ class MainActivity : ComponentActivity() {
 
                 Button(onClick = {
                     CoroutineScope(Dispatchers.Main).launch {
-                        status = "Syncing..."
-                        withHealthPermissions { client ->
-                            val startOfMonth = today.withDayOfMonth(1)
-                            val daysSinceStart = java.time.temporal.ChronoUnit.DAYS.between(startOfMonth, today).toInt()
-                            SyncHelper.performSync(client, serverUrl, serverUrlBackup, appPin, daysSinceStart) { newStatus ->
-                                status = newStatus
-                            }
+                        status = "Синхронизация с Xiaomi Band..."
+                        SyncHelper.performBandSync(this@MainActivity, serverUrl, serverUrlBackup, appPin) { newStatus ->
+                            status = newStatus
                         }
                     }
                 }) {
