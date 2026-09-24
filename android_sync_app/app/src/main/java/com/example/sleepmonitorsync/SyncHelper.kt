@@ -36,7 +36,9 @@ object SyncHelper {
         pin: String,
         onStatus: (String) -> Unit
     ): Boolean {
-        val credentials = BandCredentials.load(context)
+        return XiaomiBandClassicConnection.withExclusiveSppOperation {
+            Log.i(TAG, "Xiaomi SPP operation lock acquired")
+            val credentials = BandCredentials.load(context)
         val authKey = credentials.authKeyHex.trim().removePrefix("0x").removePrefix("0X")
         if (authKey.length != 32 || authKey.any { it.digitToIntOrNull(16) == null }) {
             val msg = "⚠️ Xiaomi auth key не задан. Откройте Настройки → Xiaomi Band и введите 32 hex-символа."
@@ -94,6 +96,7 @@ object SyncHelper {
             return false
         } finally {
             connection.disconnect()
+            }
         }
     }
 
