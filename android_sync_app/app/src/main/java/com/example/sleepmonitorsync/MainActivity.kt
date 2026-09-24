@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v20 (24.09.2026) - проверка подключения в Настройках"
+        const val APP_BUILD_TAG = "v21 (24.09.2026) - фоновая синхронизация раз в час"
     }
 
     private val permissions = setOf(
@@ -62,13 +62,6 @@ class MainActivity : ComponentActivity() {
 
         val prefs = getSharedPreferences("prefs", MODE_PRIVATE)
 
-        // Defaults below are only fallback VALUES for display in the UI state —
-        // getString() does NOT persist them to SharedPreferences on its own.
-        // SyncWorker reads these same keys directly from SharedPreferences (with an
-        // empty-string fallback, so it can detect "not configured" and abort safely).
-        // Without writing the defaults back here, a fresh install shows a fully
-        // filled-in form but SyncWorker sees empty values and silently aborts every
-        // hour until the user manually edits a field. Persist any missing default now.
         val defaultServerUrl = "http://192.168.2.2:8000"
         val defaultServerUrlBackup = "https://sm.vsuh.duckdns.org:912"
         val defaultAppPin = "1679"
@@ -102,14 +95,8 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Этап A/B (Classic SPP auth + activity fetch) — see
-        // 10-projects/sleep-monitor/task.md. Separate debug section below, not part of
-        // the Health Connect flow above.
         var bleStatus by mutableStateOf("")
         var bleRunning by mutableStateOf(false)
-        // Which transport to run once BLUETOOTH_CONNECT/SCAN are granted - set by
-        // whichever debug button was tapped, consumed by requestBluetoothPermissions'
-        // callback below.
         var pendingTransport: (suspend () -> String)? = null
 
         fun runBandTest(transport: suspend () -> String) {
@@ -121,9 +108,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Classic SPP (XiaomiBandClassicConnection) needs BLUETOOTH_CONNECT to open the
-        // RFCOMM socket, and BLUETOOTH_SCAN purely because BluetoothAdapter.cancelDiscovery()
-        // is classified as a scan op by the platform - request both together.
         val requestBluetoothPermissions = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { grantedMap ->
@@ -265,9 +249,6 @@ class MainActivity : ComponentActivity() {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(status)
 
-                // --- Xiaomi Band Classic SPP: auth (Этап A) + activity fetch (Этап B), debug ---
-                // BLE GATT button removed - confirmed non-functional for this device
-                // (see task.md). Classic SPP is the only transport this band responds to.
                 Spacer(modifier = Modifier.height(32.dp))
                 Text("Xiaomi Band (debug)")
                 Spacer(modifier = Modifier.height(8.dp))
@@ -290,21 +271,12 @@ class MainActivity : ComponentActivity() {
                         Text("Копировать результат")
                     }
                 }
-                // Bottom breathing room so the last line of a long fetch-result
-                // message isn't flush against the screen edge / nav bar.
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
 }
 
-/**
- * Settings screen: server/PIN config (moved here from the main screen, 2026-09-19 per
- * user request) plus the Xiaomi band's MAC address + auth key ([BandCredentials]) - the
- * auth key needs occasional manual updates whenever it rotates (e.g. after a Mi Fitness
- * reinstall - see 10-projects/sleep-monitor/task.md), so exposing it here avoids
- * needing a rebuild each time.
- */
 @Composable
 private fun SettingsScreen(
     serverUrl: String,
