@@ -445,3 +445,8 @@ Auth key Xiaomi не является стабильным значением: �
 ### Периодическая синхронизация переведена на Xiaomi Band (2026-09-24)
 
 SyncWorker теперь использует performBandSync() вместо Health Connect: периодический WorkManager запуск подключается к браслету по Classic SPP, забирает накопившиеся activity-файлы и отправляет их в backend. При отсутствии auth key worker завершается без retry; при ошибках Bluetooth/сервера performBandSync() возвращает false и WorkManager получает Result.retry().
+
+
+### Кнопка Sync Now переведена на Xiaomi (build v16, 2026-09-24)
+
+Главная кнопка Sync Now теперь запускает performBandSync() напрямую и больше не требует разрешений Health Connect. Старый Health Connect путь оставлен для Sync Range/backfill до отдельного решения по его судьбе.
