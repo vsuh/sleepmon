@@ -79,7 +79,7 @@ def parse_note(content: str | None) -> dict:
         "sleep_light_min": 0,
         "sleep_deep_min": 0,
         "sleep_rem_min": 0,
-        "sleep_awake_min": 0,
+        "sleep_awakenings": 0,
     }
     if content and content.startswith("---"):
         parts = content.split("---", 2)
@@ -94,7 +94,7 @@ def parse_note(content: str | None) -> dict:
             result["sleep_light_min"] = frontmatter.get("sleep_light_min", 0)
             result["sleep_deep_min"] = frontmatter.get("sleep_deep_min", 0)
             result["sleep_rem_min"] = frontmatter.get("sleep_rem_min", 0)
-            result["sleep_awake_min"] = frontmatter.get("sleep_awake_min", 0)
+            result["sleep_awakenings"] = frontmatter.get("sleep_awakenings", 0)
     return result
 
 
@@ -249,7 +249,7 @@ async def save(request: Request,
         "sleep_light_min": existing["sleep_light_min"],
         "sleep_deep_min": existing["sleep_deep_min"],
         "sleep_rem_min": existing["sleep_rem_min"],
-        "sleep_awake_min": existing["sleep_awake_min"],
+        "sleep_awakenings": existing["sleep_awakenings"],
         "well_being": well_being,
         "alco": alco
     }
@@ -284,7 +284,7 @@ async def sync_endpoint(request: Request,
                sleep_light_min: int = Form(0),
                sleep_deep_min: int = Form(0),
                sleep_rem_min: int = Form(0),
-               sleep_awake_min: int = Form(0)):
+               sleep_awakenings: int = Form(0)):
     """Automatic periodic sync from the Android app.
 
     Unlike /save (manual form save, full overwrite), this endpoint MERGES with
@@ -295,10 +295,8 @@ async def sync_endpoint(request: Request,
     - `sleep_hours` is "fill-once": only written when the existing value is 0,
       and only with a non-zero incoming value. Once a real value is recorded,
       sync will never overwrite it again (can't "re-measure" sleep mid-day).
-      The sleep-phase breakdown (`sleep_light_min`/`sleep_deep_min`/
-      `sleep_rem_min`/`sleep_awake_min`) shares this fill-once gate — they're
-      derived from the same Health Connect sleep session as `sleep_hours`,
-      so they fill together and freeze together.
+      `sleep_awakenings` shares this fill-once gate with `sleep_hours` — it is
+      the count of distinct awakenings inside the sleep period.
     - `steps_1`, `steps_2` (and derived `steps_total`) are ALWAYS updated —
       they accumulate throughout the day and should reflect current totals.
     - `pulse_avg_day` / `pulse_avg_sleep` are NOT fill-once: they reflect
@@ -326,7 +324,7 @@ async def sync_endpoint(request: Request,
 
     logger.info(f"/sync called for {date}: sleep={sleep_hours}h, pulse_day={pulse_avg_day}, "
                 f"pulse_sleep={pulse_avg_sleep}, steps={steps_1}, "
-                f"phases(L/D/R/A)={sleep_light_min}/{sleep_deep_min}/{sleep_rem_min}/{sleep_awake_min}min")
+                f"awakenings={sleep_awakenings}")
 
     try:
         content = obsidian.get_note_content(date)
@@ -339,14 +337,11 @@ async def sync_endpoint(request: Request,
 
     existing = parse_note(content)
 
-    # sleep_hours (and phase breakdown) share one fill-once gate:
+    # sleep_hours and awakening count share one fill-once gate:
     # can't "remeasure" a night's sleep mid-day.
     should_fill_sleep = not existing["sleep_hours"]
     final_sleep_hours = round(sleep_hours, 1) if should_fill_sleep else existing["sleep_hours"]
-    final_sleep_light_min = sleep_light_min if should_fill_sleep else existing["sleep_light_min"]
-    final_sleep_deep_min = sleep_deep_min if should_fill_sleep else existing["sleep_deep_min"]
-    final_sleep_rem_min = sleep_rem_min if should_fill_sleep else existing["sleep_rem_min"]
-    final_sleep_awake_min = sleep_awake_min if should_fill_sleep else existing["sleep_awake_min"]
+    final_sleep_awakenings = sleep_awakenings if should_fill_sleep else existing["sleep_awakenings"]
 
     # steps: ALWAYS update (accumulate throughout the day)
     final_steps_1 = steps_1
@@ -369,7 +364,7 @@ async def sync_endpoint(request: Request,
         "sleep_light_min": final_sleep_light_min,
         "sleep_deep_min": final_sleep_deep_min,
         "sleep_rem_min": final_sleep_rem_min,
-        "sleep_awake_min": final_sleep_awake_min,
+        "sleep_awakenings": final_sleep_awakenings,
         "well_being": well_being,
         "alco": existing["alco"]
     }
