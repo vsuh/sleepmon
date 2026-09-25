@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit
 import com.example.sleepmonitorsync.band.BandCredentials
 import com.example.sleepmonitorsync.band.XiaomiBandClassicConnection
 import com.example.sleepmonitorsync.band.activity.ActivitySample
+import com.example.sleepmonitorsync.band.activity.SleepDetailsParser
 
 object SyncHelper {
     /**
@@ -70,7 +71,7 @@ object SyncHelper {
             val result = fetch.getOrThrow()
             onStatus("📊 Получено файлов: ${result.filesReceived}, минутных записей: ${result.perMinuteSamples.size}")
 
-            val days = aggregateBandSamples(result.perMinuteSamples, result.dailySummaries)
+            val days = aggregateBandSamples(result.perMinuteSamples, result.dailySummaries, result.sleepSummaries)
             if (days.isEmpty()) {
                 onStatus("ℹ️ Браслет не вернул новых распознанных данных")
                 return@withExclusiveSppOperation true
@@ -112,7 +113,8 @@ object SyncHelper {
 
     private fun aggregateBandSamples(
         samples: List<ActivitySample>,
-        summaries: List<com.example.sleepmonitorsync.band.activity.DailySummary>
+        summaries: List<com.example.sleepmonitorsync.band.activity.DailySummary>,
+        sleepSummaries: List<SleepDetailsParser.SleepSummary>,
     ): List<BandDayAggregate> {
         val unique = samples.groupBy { it.timestampSeconds }
             .mapValues { (_, sameMinute) ->
@@ -126,8 +128,15 @@ object SyncHelper {
         val summaryByDay = summaries.associateBy {
             Instant.ofEpochSecond(it.timestampSeconds.toLong()).atZone(ZoneId.systemDefault()).toLocalDate()
         }
+        // Sleep belongs to the local date on which the user woke up.
+        val sleepByDay = sleepSummaries.associateBy {
+            Instant.ofEpochSecond(it.wakeupTimeSeconds.toLong()).atZone(ZoneId.systemDefault()).toLocalDate()
+        }
+        val dates = (byDay.keys + sleepByDay.keys).toSortedSet()
 
-        return byDay.map { (date, daySamples) ->
+        return dates.map { date ->
+            val daySamples = byDay[date].orEmpty()
+            val sleep = sleepByDay[date]
             val firstHalfSteps = daySamples.filter {
                 Instant.ofEpochSecond(it.timestampSeconds.toLong()).atZone(ZoneId.systemDefault()).hour < 12
             }.sumOf { it.steps ?: 0 }
@@ -138,7 +147,14 @@ object SyncHelper {
             val summary = summaryByDay[date]
             val pulse = if (hr.isNotEmpty()) hr.average().toInt() else (summary?.hrAvg ?: 0)
 
-            BandDayAggregate(date = date, steps1 = firstHalfSteps, steps2 = secondHalfSteps, pulseAvgDay = pulse)
+            BandDayAggregate(
+                date = date,
+                steps1 = firstHalfSteps,
+                steps2 = secondHalfSteps,
+                pulseAvgDay = pulse,
+                sleepHours = sleep?.sleepDurationMinutes?.div(60.0) ?: 0.0,
+                sleepAwakenings = sleep?.wakeCount ?: 0,
+            )
         }
     }
     private const val TAG = "SyncHelper"
