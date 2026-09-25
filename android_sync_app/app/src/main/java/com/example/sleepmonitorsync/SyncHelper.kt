@@ -80,8 +80,8 @@ object SyncHelper {
             val (activeUrl, cookie) = resolveActiveServer(primaryUrl, backupUrl, pin, onStatus)
             for (day in days.sortedBy { it.date }) {
                 postToServer(activeUrl, cookie, day.date.toString(), day.sleepHours, day.pulseAvgDay,
-                    day.pulseAvgSleep, day.steps1, day.steps2, day.sleepAwakenings)
-                onStatus("✅ ${day.date}: шаги ${day.steps1 + day.steps2}, пульс ${day.pulseAvgDay}")
+                    day.pulseAvgSleep, day.stepsTotal, day.sleepAwakenings)
+                onStatus("✅ ${day.date}: шаги ${day.stepsTotal}, пульс ${day.pulseAvgDay}")
             }
 
             if (!connection.acknowledgeFetchedFiles()) {
@@ -103,8 +103,7 @@ object SyncHelper {
 
     private data class BandDayAggregate(
         val date: LocalDate,
-        val steps1: Int,
-        val steps2: Int,
+        val stepsTotal: Int,
         val pulseAvgDay: Int,
         val pulseAvgSleep: Int = 0,
         val sleepHours: Double = 0.0,
@@ -149,18 +148,16 @@ object SyncHelper {
             }.sumOf { it.steps ?: 0 }
             val sampledTotalSteps = sampledFirstHalfSteps + sampledSecondHalfSteps
             val summary = summaryByDay[date]
-            val (firstHalfSteps, secondHalfSteps) = if (sampledTotalSteps > 0) {
-                sampledFirstHalfSteps to sampledSecondHalfSteps
-            } else {
-                (summary?.steps?.coerceAtLeast(0) ?: 0) to 0
-            }
+            // The Xiaomi daily summary is the authoritative whole-day counter.
+            // Minute details may contain only partial/duplicate slices, so they
+            // must not override the summary when it is available.
+            val stepsTotal = summary?.steps?.coerceAtLeast(0) ?: sampledTotalSteps
             val hr = daySamples.mapNotNull { it.heartRate?.takeIf { bpm -> bpm > 0 } }
             val pulse = if (hr.isNotEmpty()) hr.average().toInt() else (summary?.hrAvg ?: 0)
 
             BandDayAggregate(
                 date = date,
-                steps1 = firstHalfSteps,
-                steps2 = secondHalfSteps,
+                stepsTotal = stepsTotal,
                 pulseAvgDay = pulse,
                 sleepHours = sleep?.sleepDurationMinutes?.div(60.0) ?: 0.0,
                 sleepAwakenings = sleep?.wakeCount ?: 0,
@@ -447,8 +444,7 @@ object SyncHelper {
                     .add("sleep_hours", sleep.toString())
                     .add("pulse_avg_day", hrDay.toString())
                     .add("pulse_avg_sleep", hrSleep.toString())
-                    .add("steps_1", steps1.toString())
-                    .add("steps_2", steps2.toString())
+                    .add("steps_total", stepsTotal.toString())
                     .add("sleep_awakenings", sleepAwakenings.toString())
                     .build()
 
