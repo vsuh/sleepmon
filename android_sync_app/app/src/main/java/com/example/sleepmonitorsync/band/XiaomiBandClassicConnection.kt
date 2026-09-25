@@ -662,7 +662,14 @@ class XiaomiBandClassicConnection(
                 }
                 isSleepCombo -> {
                     val sleep = SleepDetailsParser.parse(fileId, data)
-                    if (sleep != null) { sleepSummaries.add(sleep); true } else false
+                    if (sleep != null) {
+                        sleepSummaries.add(sleep)
+                        Log.i(TAG, "Parsed Xiaomi sleep: bed=${sleep.bedTimeSeconds}, wake=${sleep.wakeupTimeSeconds}, duration=${sleep.sleepDurationMinutes} min, awakenings=${sleep.wakeCount}")
+                        true
+                    } else {
+                        Log.w(TAG, "❌ Xiaomi sleep parser returned null for v${fileId.version} (${data.size} bytes)")
+                        false
+                    }
                 }
                 else -> false
             }
