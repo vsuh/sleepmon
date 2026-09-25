@@ -67,15 +67,14 @@ def parse_note(content: str | None) -> dict:
 
     Defaults assume a brand-new note (nothing recorded yet):
     well_being unset, no alcohol flag, no free-text notes, and the
-    "fill-once" numeric fields (sleep_hours/steps_1/steps_2/sleep phases) at 0.
+    "fill-once" numeric fields (sleep_hours/sleep phases) at 0.
     """
     result = {
         "well_being": 0,
         "alco": False,
         "notes": "",
         "sleep_hours": 0,
-        "steps_1": 0,
-        "steps_2": 0,
+        "steps_total": 0,
         "sleep_awakenings": 0,
     }
     if content and content.startswith("---"):
@@ -86,8 +85,7 @@ def parse_note(content: str | None) -> dict:
             result["alco"] = frontmatter.get("alco", False)
             result["notes"] = parts[2].replace("## Заметки\n\n", "").strip()
             result["sleep_hours"] = frontmatter.get("sleep_hours", 0)
-            result["steps_1"] = frontmatter.get("steps_1", 0)
-            result["steps_2"] = frontmatter.get("steps_2", 0)
+            result["steps_total"] = frontmatter.get("steps_total", frontmatter.get("steps_1", 0) + frontmatter.get("steps_2", 0))
             result["sleep_awakenings"] = frontmatter.get("sleep_awakenings", 0)
     return result
 
@@ -161,8 +159,7 @@ async def index(request: Request, background_tasks: BackgroundTasks, date: str =
         "sleep_hours": "",
         "pulse_avg_day": "",
         "pulse_avg_sleep": "",
-        "steps_1": "",
-        "steps_2": "",
+        "steps_total": "",
         "well_being": 5,
         "alco": False,
         "notes": ""
@@ -205,8 +202,7 @@ async def save(request: Request,
                sleep_hours: float = Form(0),
                pulse_avg_day: int = Form(0),
                pulse_avg_sleep: int = Form(0),
-               steps_1: int = Form(0),
-               steps_2: int = Form(0),
+               steps_total: int = Form(0),
                well_being: int = Form(5),
                alco: bool = Form(False),
                notes: str = Form("")):
@@ -214,7 +210,7 @@ async def save(request: Request,
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     logger.info(f"/save called for {date}: sleep={sleep_hours}h, pulse_day={pulse_avg_day}, "
-                f"pulse_sleep={pulse_avg_sleep}, steps={steps_1}+{steps_2}, well_being={well_being}, alco={alco}")
+                f"pulse_sleep={pulse_avg_sleep}, steps={steps_total}, well_being={well_being}, alco={alco}")
 
     # Sleep-phase fields (sleep_light_min/deep/rem/awake) aren't part of this
     # form — they're populated by /sync from Health Connect. Read the current
@@ -228,8 +224,6 @@ async def save(request: Request,
         logger.warning(f"/save: could not read existing note for {date} to preserve sleep phases: {e}")
         existing = parse_note(None)
 
-    steps_total = steps_1 + steps_2
-
     frontmatter = {
         "project": "sleepmon",
         "created": date,
@@ -237,8 +231,6 @@ async def save(request: Request,
         "sleep_hours": round(sleep_hours, 1),
         "pulse_avg_day": pulse_avg_day,
         "pulse_avg_sleep": pulse_avg_sleep,
-        "steps_1": steps_1,
-        "steps_2": steps_2,
         "steps_total": steps_total,
         "sleep_awakenings": existing["sleep_awakenings"],
         "well_being": well_being,
@@ -270,8 +262,7 @@ async def sync_endpoint(request: Request,
                sleep_hours: float = Form(0),
                pulse_avg_day: int = Form(0),
                pulse_avg_sleep: int = Form(0),
-               steps_1: int = Form(0),
-               steps_2: int = Form(0),
+               steps_total: int = Form(0),
                sleep_awakenings: int = Form(0)):
     """Automatic periodic sync from the Android app.
 
@@ -285,8 +276,7 @@ async def sync_endpoint(request: Request,
       sync will never overwrite it again (can't "re-measure" sleep mid-day).
       `sleep_awakenings` shares this fill-once gate with `sleep_hours` — it is
       the count of distinct awakenings inside the sleep period.
-    - `steps_1`, `steps_2` (and derived `steps_total`) are ALWAYS updated —
-      they accumulate throughout the day and should reflect current totals.
+    - `steps_total` is ALWAYS updated — it accumulates throughout the day and is the only stored step counter.
     - `pulse_avg_day` / `pulse_avg_sleep` are NOT fill-once: they reflect
       naturally fluctuating readings and are always updated on every sync.
     - `related` is recomputed from the note's own date every time (cheap,
@@ -311,7 +301,7 @@ async def sync_endpoint(request: Request,
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     logger.info(f"/sync called for {date}: sleep={sleep_hours}h, pulse_day={pulse_avg_day}, "
-                f"pulse_sleep={pulse_avg_sleep}, steps={steps_1}, "
+                f"pulse_sleep={pulse_avg_sleep}, steps={steps_total}, "
                 f"awakenings={sleep_awakenings}")
 
     try:
@@ -332,9 +322,7 @@ async def sync_endpoint(request: Request,
     final_sleep_awakenings = sleep_awakenings if should_fill_sleep else existing["sleep_awakenings"]
 
     # steps: ALWAYS update (accumulate throughout the day)
-    final_steps_1 = steps_1
-    final_steps_2 = steps_2
-    steps_total = final_steps_1 + final_steps_2
+    final_steps_total = steps_total
 
     # well_being: preserve whatever is currently in Obsidian (freshly read above)
     well_being = existing["well_being"] if existing["well_being"] else 0
@@ -346,9 +334,7 @@ async def sync_endpoint(request: Request,
         "sleep_hours": final_sleep_hours,
         "pulse_avg_day": pulse_avg_day,
         "pulse_avg_sleep": pulse_avg_sleep,
-        "steps_1": final_steps_1,
-        "steps_2": final_steps_2,
-        "steps_total": steps_total,
+        "steps_total": final_steps_total,
         "sleep_awakenings": final_sleep_awakenings,
         "well_being": well_being,
         "alco": existing["alco"]
@@ -388,15 +374,13 @@ async def sync_endpoint(request: Request,
         set_note_cache(date, saved_content or note_content)
         logger.info(
             f"✅ /sync: note for {date} saved and verified "
-            f"(steps_total={steps_total}, sleep={final_sleep_hours}h"
+            f"(steps_total={final_steps_total}, sleep={final_sleep_hours}h"
             f"{' [filled]' if should_fill_sleep else ' [preserved]'})"
         )
         return JSONResponse({
             "status": "ok",
             "date": date,
-            "steps_1": saved["steps_1"],
-            "steps_2": saved["steps_2"],
-            "steps_total": saved["steps_1"] + saved["steps_2"],
+            "steps_total": saved["steps_total"],
         })
     else:
         logger.error(f"❌ /sync: failed to save note for {date} to Obsidian")
