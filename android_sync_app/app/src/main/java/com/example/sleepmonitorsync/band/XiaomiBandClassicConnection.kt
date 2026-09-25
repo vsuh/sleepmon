@@ -12,6 +12,7 @@ import com.example.sleepmonitorsync.band.activity.ActivitySample
 import com.example.sleepmonitorsync.band.activity.DailyDetailsParser
 import com.example.sleepmonitorsync.band.activity.DailySummary
 import com.example.sleepmonitorsync.band.activity.DailySummaryParser
+import com.example.sleepmonitorsync.band.activity.SleepDetailsParser
 import com.example.sleepmonitorsync.band.activity.XiaomiActivityFileId
 import com.example.sleepmonitorsync.band.proto.XiaomiProto
 import kotlinx.coroutines.CompletableDeferred
@@ -143,6 +144,7 @@ class XiaomiBandClassicConnection(
     data class FetchResult(
         val perMinuteSamples: List<ActivitySample>,
         val dailySummaries: List<DailySummary>,
+        val sleepSummaries: List<SleepDetailsParser.SleepSummary>,
         val filesReceived: Int,
         val filesFailed: Int,
         val filesUnsupported: Int,
@@ -165,6 +167,7 @@ class XiaomiBandClassicConnection(
     private var fetchActive = false
     private val perMinuteSamples = mutableListOf<ActivitySample>()
     private val dailySummaries = mutableListOf<DailySummary>()
+    private val sleepSummaries = mutableListOf<SleepDetailsParser.SleepSummary>()
     private var filesReceived = 0
     private var filesFailed = 0
     private var filesUnsupported = 0
@@ -524,6 +527,7 @@ class XiaomiBandClassicConnection(
         fetchActive = true
         perMinuteSamples.clear()
         dailySummaries.clear()
+        sleepSummaries.clear()
         filesReceived = 0
         filesFailed = 0
         filesUnsupported = 0
@@ -550,7 +554,7 @@ class XiaomiBandClassicConnection(
     }
 
     private fun currentResult() = FetchResult(
-        perMinuteSamples.toList(), dailySummaries.toList(),
+        perMinuteSamples.toList(), dailySummaries.toList(), sleepSummaries.toList(),
         filesReceived, filesFailed, filesUnsupported, unsupportedFileDescriptions.toList(),
     )
 
@@ -635,22 +639,32 @@ class XiaomiBandClassicConnection(
         val fileId = XiaomiActivityFileId.from(data.copyOfRange(0, 7))
         Log.i(TAG, "Received file $fileId (${data.size} bytes)")
 
-        val isKnownCombo = fileId.type == XiaomiActivityFileId.TYPE_ACTIVITY && fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_DAILY &&
+        val isDailyCombo = fileId.type == XiaomiActivityFileId.TYPE_ACTIVITY &&
+            fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_DAILY &&
             (fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_DETAILS || fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_SUMMARY)
+        val isSleepCombo = fileId.type == XiaomiActivityFileId.TYPE_ACTIVITY &&
+            fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_SLEEP &&
+            (fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_DETAILS || fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_SUMMARY)
+        val isKnownCombo = isDailyCombo || isSleepCombo
 
         if (!isKnownCombo) {
             filesUnsupported++
             unsupportedFileDescriptions.add("type=${fileId.type}/subtype=${fileId.subtype}/detail=${fileId.detailType}/v${fileId.version} (${data.size}б)")
         } else {
-            val parsedOk = when (fileId.detailType) {
-                XiaomiActivityFileId.DETAIL_TYPE_DETAILS -> {
+            val parsedOk = when {
+                isDailyCombo && fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_DETAILS -> {
                     val samples = DailyDetailsParser.parse(fileId, data)
                     if (samples != null) { perMinuteSamples.addAll(samples); true } else false
                 }
-                else -> {
+                isDailyCombo && fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_SUMMARY -> {
                     val summary = DailySummaryParser.parse(fileId, data)
                     if (summary != null) { dailySummaries.add(summary); true } else false
                 }
+                isSleepCombo -> {
+                    val sleep = SleepDetailsParser.parse(fileId, data)
+                    if (sleep != null) { sleepSummaries.add(sleep); true } else false
+                }
+                else -> false
             }
             if (parsedOk) {
                 filesReceived++
@@ -675,9 +689,10 @@ class XiaomiBandClassicConnection(
 
     private fun parsedOkForAck(fileId: XiaomiActivityFileId, isKnownCombo: Boolean): Boolean {
         if (!isKnownCombo) return false
-        return when (fileId.detailType) {
-            XiaomiActivityFileId.DETAIL_TYPE_DETAILS -> DailyDetailsParser.headerSizeForVersion(fileId.version) != null
-            XiaomiActivityFileId.DETAIL_TYPE_SUMMARY -> fileId.version == 5
+        return when {
+            fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_SLEEP -> fileId.version in 1..4
+            fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_DETAILS -> DailyDetailsParser.headerSizeForVersion(fileId.version) != null
+            fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_SUMMARY -> fileId.version == 5
             else -> false
         }
     }
