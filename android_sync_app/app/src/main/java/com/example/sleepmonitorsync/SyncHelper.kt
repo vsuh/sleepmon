@@ -132,19 +132,29 @@ object SyncHelper {
         val sleepByDay = sleepSummaries.associateBy {
             Instant.ofEpochSecond(it.wakeupTimeSeconds.toLong()).atZone(ZoneId.systemDefault()).toLocalDate()
         }
-        val dates = (byDay.keys + sleepByDay.keys).toSortedSet()
+        // A daily summary is an authoritative whole-day step counter. Some real band
+        // syncs provide a summary file even when the per-minute details contain no
+        // usable step samples, so include summary-only dates and use summary.steps as
+        // the fallback instead of silently uploading zero steps.
+        val dates = (byDay.keys + summaryByDay.keys + sleepByDay.keys).toSortedSet()
 
         return dates.map { date ->
             val daySamples = byDay[date].orEmpty()
             val sleep = sleepByDay[date]
-            val firstHalfSteps = daySamples.filter {
+            val sampledFirstHalfSteps = daySamples.filter {
                 Instant.ofEpochSecond(it.timestampSeconds.toLong()).atZone(ZoneId.systemDefault()).hour < 12
             }.sumOf { it.steps ?: 0 }
-            val secondHalfSteps = daySamples.filter {
+            val sampledSecondHalfSteps = daySamples.filter {
                 Instant.ofEpochSecond(it.timestampSeconds.toLong()).atZone(ZoneId.systemDefault()).hour >= 12
             }.sumOf { it.steps ?: 0 }
-            val hr = daySamples.mapNotNull { it.heartRate?.takeIf { bpm -> bpm > 0 } }
+            val sampledTotalSteps = sampledFirstHalfSteps + sampledSecondHalfSteps
             val summary = summaryByDay[date]
+            val (firstHalfSteps, secondHalfSteps) = if (sampledTotalSteps > 0) {
+                sampledFirstHalfSteps to sampledSecondHalfSteps
+            } else {
+                (summary?.steps?.coerceAtLeast(0) ?: 0) to 0
+            }
+            val hr = daySamples.mapNotNull { it.heartRate?.takeIf { bpm -> bpm > 0 } }
             val pulse = if (hr.isNotEmpty()) hr.average().toInt() else (summary?.hrAvg ?: 0)
 
             BandDayAggregate(
