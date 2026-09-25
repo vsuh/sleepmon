@@ -357,17 +357,16 @@ async def sync_endpoint(request: Request,
             logger.error(f"❌ /sync: write succeeded but verification read failed for {date}: {e}")
             raise HTTPException(status_code=502, detail=f"Sync write could not be verified for {date}: {e}")
 
-        if saved["steps_1"] != final_steps_1 or saved["steps_2"] != final_steps_2:
+        if saved["steps_total"] != final_steps_total:
             logger.error(
                 f"❌ /sync: steps verification failed for {date}: "
-                f"sent={final_steps_1}+{final_steps_2}, saved={saved['steps_1']}+{saved['steps_2']}"
+                f"sent={final_steps_total}, saved={saved['steps_total']}"
             )
             raise HTTPException(
                 status_code=502,
                 detail=(
                     f"Steps were not persisted for {date}: "
-                    f"sent {final_steps_1}+{final_steps_2}, "
-                    f"saved {saved['steps_1']}+{saved['steps_2']}"
+                    f"sent={final_steps_total}, saved={saved['steps_total']}"
                 ),
             )
 
