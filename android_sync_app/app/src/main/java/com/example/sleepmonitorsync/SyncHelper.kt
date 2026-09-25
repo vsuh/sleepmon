@@ -452,7 +452,8 @@ object SyncHelper {
                 val syncResp = client.newCall(syncReq).execute()
 
                 if (syncResp.isSuccessful) {
-                    Log.i(TAG, "✅ Server accepted data for $date (HTTP ${syncResp.code})")
+                    val responseBody = syncResp.body?.string().orEmpty()
+                    Log.i(TAG, "✅ Server accepted data for $date (HTTP ${syncResp.code}): $responseBody")
                 } else {
                     throw Exception("Server returned HTTP ${syncResp.code}")
                 }
