@@ -39,6 +39,9 @@ data class XiaomiActivityFileId(
         const val TYPE_SPORTS = 1
 
         const val SUBTYPE_ACTIVITY_DAILY = 0
+        const val SUBTYPE_ACTIVITY_SLEEP_STAGES = 3
+        const val SUBTYPE_ACTIVITY_MANUAL_SAMPLES = 6
+        const val SUBTYPE_ACTIVITY_SLEEP = 8
 
         const val DETAIL_TYPE_DETAILS = 0
         const val DETAIL_TYPE_SUMMARY = 1
