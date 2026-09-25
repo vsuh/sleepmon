@@ -140,13 +140,7 @@ object SyncHelper {
         return dates.map { date ->
             val daySamples = byDay[date].orEmpty()
             val sleep = sleepByDay[date]
-            val sampledFirstHalfSteps = daySamples.filter {
-                Instant.ofEpochSecond(it.timestampSeconds.toLong()).atZone(ZoneId.systemDefault()).hour < 12
-            }.sumOf { it.steps ?: 0 }
-            val sampledSecondHalfSteps = daySamples.filter {
-                Instant.ofEpochSecond(it.timestampSeconds.toLong()).atZone(ZoneId.systemDefault()).hour >= 12
-            }.sumOf { it.steps ?: 0 }
-            val sampledTotalSteps = sampledFirstHalfSteps + sampledSecondHalfSteps
+            val sampledTotalSteps = daySamples.sumOf { it.steps ?: 0 }
             val summary = summaryByDay[date]
             // The Xiaomi daily summary is the authoritative whole-day counter.
             // Minute details may contain only partial/duplicate slices, so they
