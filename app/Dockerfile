@@ -4,7 +4,7 @@ FROM python:3.11-slim
 # save space), so TZ=Europe/Moscow from docker-compose.yml has nothing to
 # apply to — Python's local-time functions have no zoneinfo files to read
 # the +3 offset from. Install tzdata explicitly so TZ actually works.
-RUN apt-get update && apt-get install -y --no-install-recommends tzdata \
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata curl \
     && rm -rf /var/lib/apt/lists/*
 ENV TZ=Europe/Moscow
 
