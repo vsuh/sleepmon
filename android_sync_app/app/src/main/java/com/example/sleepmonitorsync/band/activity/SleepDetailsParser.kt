@@ -1,5 +1,6 @@
 package com.example.sleepmonitorsync.band.activity
 
+import java.nio.BufferUnderflowException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -119,12 +120,17 @@ object SleepDetailsParser {
                 }
             }
 
+            if (sleepDurationMinutes == 0 && wakeupTime > bedTime) {
+                sleepDurationMinutes = (wakeupTime - bedTime) / 60
+            }
             SleepSummary(
                 bedTimeSeconds = bedTime,
                 wakeupTimeSeconds = wakeupTime,
                 sleepDurationMinutes = sleepDurationMinutes,
                 wakeCount = wakeCount,
             )
+        } catch (_: BufferUnderflowException) {
+            null
         } catch (_: IndexOutOfBoundsException) {
             null
         } catch (_: IllegalArgumentException) {
