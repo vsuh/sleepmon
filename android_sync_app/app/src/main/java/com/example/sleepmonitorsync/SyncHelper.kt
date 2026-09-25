@@ -405,7 +405,7 @@ object SyncHelper {
                 "sleep=$sleepHours h, awakenings=$sleepAwakenings")
         postToServer(
             url, cookie, targetDay.toString(), sleepHours, hrDayAvg.toInt(), hrSleepAvg.toInt(),
-            totalSteps.toInt(), 0, sleepAwakenings
+            totalSteps.toInt(), sleepAwakenings
         )
     }
 
@@ -421,8 +421,7 @@ object SyncHelper {
         sleep: Double,
         hrDay: Int,
         hrSleep: Int,
-        steps1: Int,
-        steps2: Int,
+        stepsTotal: Int,
         sleepAwakenings: Int
     ) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
