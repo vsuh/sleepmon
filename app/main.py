@@ -360,10 +360,44 @@ async def sync_endpoint(request: Request,
     success = obsidian.save_note_content(date, note_content)
 
     if success:
-        set_note_cache(date, note_content)
-        logger.info(f"✅ /sync: note for {date} saved (steps_total={steps_total}, "
-                    f"sleep={final_sleep_hours}h{' [filled]' if should_fill_sleep else ' [preserved]'})")
-        return JSONResponse({"status": "ok", "date": date})
+        # Do not report success merely because the write request returned 2xx.
+        # Read the note back from the source of truth (Obsidian) and verify that
+        # the step counters actually persisted. This makes a deployment/API/cache
+        # problem visible to Android instead of silently accepting a false success.
+        try:
+            saved_content = obsidian.get_note_content(date)
+            saved = parse_note(saved_content)
+        except ObsidianFetchError as e:
+            logger.error(f"❌ /sync: write succeeded but verification read failed for {date}: {e}")
+            raise HTTPException(status_code=502, detail=f"Sync write could not be verified for {date}: {e}")
+
+        if saved["steps_1"] != final_steps_1 or saved["steps_2"] != final_steps_2:
+            logger.error(
+                f"❌ /sync: steps verification failed for {date}: "
+                f"sent={final_steps_1}+{final_steps_2}, saved={saved['steps_1']}+{saved['steps_2']}"
+            )
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    f"Steps were not persisted for {date}: "
+                    f"sent {final_steps_1}+{final_steps_2}, "
+                    f"saved {saved['steps_1']}+{saved['steps_2']}"
+                ),
+            )
+
+        set_note_cache(date, saved_content or note_content)
+        logger.info(
+            f"✅ /sync: note for {date} saved and verified "
+            f"(steps_total={steps_total}, sleep={final_sleep_hours}h"
+            f"{' [filled]' if should_fill_sleep else ' [preserved]'})"
+        )
+        return JSONResponse({
+            "status": "ok",
+            "date": date,
+            "steps_1": saved["steps_1"],
+            "steps_2": saved["steps_2"],
+            "steps_total": saved["steps_1"] + saved["steps_2"],
+        })
     else:
         logger.error(f"❌ /sync: failed to save note for {date} to Obsidian")
         raise HTTPException(status_code=502, detail=f"Failed to save note in Obsidian for {date}")
