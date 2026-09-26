@@ -857,3 +857,21 @@ Build tag Android повышен до v36 (26.09.2026) - исправление 
 Android build tag: v38 (26.09.2026) - прежние Logcat tags.
 
 Полноценная Gradle-сборка в текущем рабочем контейнере не выполнена; после git pull обязательна локальная проверка gradlew :app:assembleDebug.
+
+### v39 — только secure SPP и версия в старых Logcat tags (26.09.2026)
+
+По результатам теста v38 видно, что приложение каждый раз сначала пробует insecure RFCOMM, получает `read failed, socket might closed or timeout`, а затем успешно подключается через secure RFCOMM.
+
+В v39:
+- удалена попытка `Insecure RFCOMM` перед обычным подключением;
+- Xiaomi SPP сразу использует secure RFCOMM;
+- при неудаче secure подключения сохраняется повтор до `MAX_CONNECT_ROUNDS` с прежней задержкой;
+- стартовая версия `v39` дополнительно выводится под старым тегом `XiaomiBandClassic`;
+- версия `v39` также выводится под старым тегом `SyncHelper` в начале операции;
+- прежний фильтр `adb logcat -s SyncHelper XiaomiBandClassic` поэтому показывает номер build прямо в выбранном потоке логов.
+
+Это изменение не меняет авторизацию, получение файлов, persistent queue, `/sync` или ACK; меняется только способ открытия RFCOMM и диагностический вывод.
+
+Android build tag: `v39 (26.09.2026) - только secure SPP`.
+
+Полноценная Gradle-сборка в текущем рабочем контейнере не выполнена; после `git pull` обязательна локальная проверка `gradlew :app:assembleDebug`.
