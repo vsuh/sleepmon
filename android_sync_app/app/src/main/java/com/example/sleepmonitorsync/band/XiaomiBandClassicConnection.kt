@@ -710,9 +710,15 @@ class XiaomiBandClassicConnection(
      * their data to the backend. Until this method is called, those files remain
      * unacknowledged on the band and can be downloaded again on the next connection.
      */
-    suspend fun acknowledgeFetchedFiles(): Boolean {
-        if (pendingFileAcks.isEmpty()) return true
-        val ids = pendingFileAcks.toList()
+    fun pendingAckFileIds(): List<ByteArray> = pendingFileAcks.map { it.copyOf() }
+
+    /**
+     * ACKs supplied file IDs only after the server has accepted their decoded data.
+     * IDs can come from the current SPP fetch or from the persistent outbox after an
+     * app restart, so ACK state is independent of the original download connection.
+     */
+    suspend fun acknowledgeFileIds(ids: List<ByteArray>): Boolean {
+        if (ids.isEmpty()) return true
 
         // The band closes the download SPP session after streaming the last file.
         // Do not try to write an ACK to that socket: the write is predictably a
@@ -735,7 +741,7 @@ class XiaomiBandClassicConnection(
                     Log.e(TAG, "❌ Failed to send deferred ACKs on fresh SPP session")
                     false
                 } else {
-                    pendingFileAcks.clear()
+                    pendingFileAcks.removeAll { pending -> ids.any { it.contentEquals(pending) } }
                     Log.i(TAG, "✅ Acknowledged ${ids.size} activity file(s) on fresh SPP session")
                     true
                 }
@@ -747,6 +753,9 @@ class XiaomiBandClassicConnection(
             reconnect.disconnect()
         }
     }
+
+    suspend fun acknowledgeFetchedFiles(): Boolean =
+        acknowledgeFileIds(pendingFileAcks.toList())
 
     private fun sendFileAcks(sock: BluetoothSocket, ids: List<ByteArray>): Boolean {
         return try {
