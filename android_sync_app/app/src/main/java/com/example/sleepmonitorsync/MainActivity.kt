@@ -41,8 +41,8 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v37 (26.09.2026) - версия в Logcat"
-        const val LOG_TAG = "SleepMonitor-v37"
+        const val APP_BUILD_TAG = "v38 (26.09.2026) - прежние Logcat tags"
+        const val LOG_TAG = "SleepMonitor-v38"
     }
 
     private val permissions = setOf(
