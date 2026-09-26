@@ -66,11 +66,11 @@ def parse_note(content: str | None) -> dict:
     """Extract the fields we need to preserve/merge on a /sync write.
 
     Defaults assume a brand-new note (nothing recorded yet):
-    well_being unset, no alcohol flag, no free-text notes, and the
+    well_being defaults to 9 for a brand-new note, no alcohol flag, no free-text notes, and the
     "fill-once" numeric fields (sleep_hours/sleep phases) at 0.
     """
     result = {
-        "well_being": 0,
+        "well_being": 9,
         "alco": False,
         "notes": "",
         "sleep_hours": 0,
@@ -160,7 +160,7 @@ async def index(request: Request, background_tasks: BackgroundTasks, date: str =
         "pulse_avg_day": "",
         "pulse_avg_sleep": "",
         "steps_total": "",
-        "well_being": 5,
+        "well_being": 9,
         "alco": False,
         "notes": ""
     }
@@ -203,7 +203,7 @@ async def save(request: Request,
                pulse_avg_day: int = Form(0),
                pulse_avg_sleep: int = Form(0),
                steps_total: int = Form(0),
-               well_being: int = Form(5),
+               well_being: int = Form(9),
                alco: bool = Form(False),
                notes: str = Form("")):
     if not verify_session(request):
@@ -324,8 +324,9 @@ async def sync_endpoint(request: Request,
     # steps: ALWAYS update (accumulate throughout the day)
     final_steps_total = steps_total
 
-    # well_being: preserve whatever is currently in Obsidian (freshly read above)
-    well_being = existing["well_being"] if existing["well_being"] else 0
+    # well_being: preserve the existing value exactly. For a brand-new note,
+    # parse_note() supplies the creation default of 9.
+    well_being = existing["well_being"]
 
     frontmatter = {
         "project": "sleepmon",
