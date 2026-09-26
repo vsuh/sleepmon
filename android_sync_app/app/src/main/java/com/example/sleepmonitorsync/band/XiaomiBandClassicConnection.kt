@@ -85,7 +85,7 @@ class XiaomiBandClassicConnection(
     private val credentials: BandCredentials,
 ) {
     companion object {
-        private const val TAG = "XiaomiBandClassic"
+        private const val TAG = "SleepMonitor-v37/XiaomiBand"
 
         private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb")
 
