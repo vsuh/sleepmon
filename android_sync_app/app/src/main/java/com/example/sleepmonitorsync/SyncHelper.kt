@@ -118,7 +118,7 @@ object SyncHelper {
             return@withExclusiveSppOperation false
         } finally {
             connection.disconnect()
-            Log.i(TAG, "═══ Xiaomi sync session завершён")
+            Log.i(TAG, "═══ Xiaomi sync session finished")
             }
         }
     }
