@@ -711,34 +711,74 @@ class XiaomiBandClassicConnection(
      * unacknowledged on the band and can be downloaded again on the next connection.
      */
     suspend fun acknowledgeFetchedFiles(): Boolean {
-        val sock = socket ?: return false
         if (pendingFileAcks.isEmpty()) return true
-        return withContext(Dispatchers.IO) {
-            try {
-                val ids = pendingFileAcks.toList()
-                ids.forEach { rawId ->
-                    val ackCmd = XiaomiProto.Command.newBuilder()
-                        .setType(CMD_TYPE_HEALTH)
-                        .setSubtype(HEALTH_SUBTYPE_ACK_FILE)
-                        .setHealth(
-                            XiaomiProto.Health.newBuilder()
-                                .setActivitySyncAckFileIds(com.google.protobuf.ByteString.copyFrom(rawId))
-                        )
-                        .build()
-                    if (!sendEncryptedProtobufCommand(sock, ackCmd)) {
-                        Log.e(TAG, "❌ Failed to send ACK for activity file")
-                        return@withContext false
-                    }
-                }
-                pendingFileAcks.clear()
-                Log.i(TAG, "✅ Acknowledged ${ids.size} activity file(s) after backend upload")
-                true
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to acknowledge activity files: ${e.message}", e)
+        val ids = pendingFileAcks.toList()
+
+        // The band may close the download SPP session as soon as it has streamed the
+        // last file. In that case the original socket cannot be used for the deferred
+        // ACK, even though the backend upload has already succeeded. Re-authenticate
+        // on a fresh SPP session and send the ACKs there.
+        val sock = socket
+        if (sock != null && sendFileAcks(sock, ids)) {
+            pendingFileAcks.clear()
+            Log.i(TAG, "✅ Acknowledged ${ids.size} activity file(s) after backend upload")
+            return true
+        }
+
+        if (sock != null) {
+            try { sock.close() } catch (_: IOException) {}
+        }
+        socket = null
+
+        Log.i(TAG, "↻ SPP session closed before ACK; reconnecting to acknowledge ${ids.size} file(s)")
+        val reconnect = XiaomiBandClassicConnection(context, credentials)
+        return try {
+            val auth = reconnect.authenticate()
+            if (auth.isFailure) {
+                Log.e(TAG, "❌ Reconnect for deferred ACK failed: ${auth.exceptionOrNull()?.message}", auth.exceptionOrNull())
                 false
+            } else {
+                val newSock = reconnect.socket
+                if (newSock == null || !reconnect.sendFileAcks(newSock, ids)) {
+                    Log.e(TAG, "❌ Failed to send deferred ACKs on fresh SPP session")
+                    false
+                } else {
+                    pendingFileAcks.clear()
+                    Log.i(TAG, "✅ Acknowledged ${ids.size} activity file(s) on fresh SPP session")
+                    true
+                }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to reconnect for deferred ACK: ${e.message}", e)
+            false
+        } finally {
+            reconnect.disconnect()
         }
     }
+
+    private fun sendFileAcks(sock: BluetoothSocket, ids: List<ByteArray>): Boolean {
+        return try {
+            ids.forEach { rawId ->
+                val ackCmd = XiaomiProto.Command.newBuilder()
+                    .setType(CMD_TYPE_HEALTH)
+                    .setSubtype(HEALTH_SUBTYPE_ACK_FILE)
+                    .setHealth(
+                        XiaomiProto.Health.newBuilder()
+                            .setActivitySyncAckFileIds(com.google.protobuf.ByteString.copyFrom(rawId))
+                    )
+                    .build()
+                if (!sendEncryptedProtobufCommand(sock, ackCmd)) {
+                    Log.e(TAG, "❌ Failed to send ACK for activity file")
+                    return false
+                }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to acknowledge activity files: ${e.message}", e)
+            false
+        }
+    }
+
     /** Post-auth Health/etc commands (type != 1) go out AES-CTR encrypted. */
     private fun sendEncryptedProtobufCommand(sock: BluetoothSocket, command: XiaomiProto.Command): Boolean {
         val material = authMaterial ?: return false
