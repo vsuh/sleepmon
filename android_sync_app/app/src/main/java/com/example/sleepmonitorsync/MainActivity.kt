@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v31 (26.09.2026) - сокращение SPP idle timeout для ACK"
+        const val APP_BUILD_TAG = "v32 (26.09.2026) - повторное SPP-подключение для deferred ACK"
     }
 
     private val permissions = setOf(
