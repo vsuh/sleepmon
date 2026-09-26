@@ -254,9 +254,16 @@ class XiaomiBandClassicConnection(
         }
 
         var sock: BluetoothSocket? = null
+        Log.i(TAG, "=== v39 (26.09.2026) - XiaomiBand ===")
         for (round in 1..MAX_CONNECT_ROUNDS) {
-            sock = openSocket(device, insecure = true)
-            if (sock == null) {
+            sock = openSocket(device, insecure = false)
+            if (sock != null) break
+            if (round < MAX_CONNECT_ROUNDS) {
+                Log.w(TAG, "[round $round] Secure RFCOMM connect failed, backing off ${CONNECT_ROUND_BACKOFF_MS}ms before retrying")
+                Thread.sleep(CONNECT_ROUND_BACKOFF_MS)
+            }
+        }
+        if (sock == null) {
                 Log.w(TAG, "[round $round] Insecure RFCOMM connect failed, retrying with a secure socket")
                 sock = openSocket(device, insecure = false)
             }
