@@ -3,6 +3,7 @@ package com.example.sleepmonitorsync
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,7 +41,8 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v36 (26.09.2026) - исправление блока persistent очереди"
+        const val APP_BUILD_TAG = "v37 (26.09.2026) - версия в Logcat"
+        const val LOG_TAG = "SleepMonitor-v37"
     }
 
     private val permissions = setOf(
@@ -53,6 +55,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.i(LOG_TAG, "=== $APP_BUILD_TAG ===")
 
         val prefs = getSharedPreferences("prefs", MODE_PRIVATE)
 
