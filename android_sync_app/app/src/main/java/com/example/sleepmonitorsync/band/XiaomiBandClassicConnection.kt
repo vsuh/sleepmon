@@ -714,23 +714,15 @@ class XiaomiBandClassicConnection(
         if (pendingFileAcks.isEmpty()) return true
         val ids = pendingFileAcks.toList()
 
-        // The band may close the download SPP session as soon as it has streamed the
-        // last file. In that case the original socket cannot be used for the deferred
-        // ACK, even though the backend upload has already succeeded. Re-authenticate
-        // on a fresh SPP session and send the ACKs there.
-        val sock = socket
-        if (sock != null && sendFileAcks(sock, ids)) {
-            pendingFileAcks.clear()
-            Log.i(TAG, "✅ Acknowledged ${ids.size} activity file(s) after backend upload")
-            return true
-        }
-
-        if (sock != null) {
-            try { sock.close() } catch (_: IOException) {}
+        // The band closes the download SPP session after streaming the last file.
+        // Do not try to write an ACK to that socket: the write is predictably a
+        // Broken pipe. Close it and use a fresh authenticated SPP session instead.
+        socket?.let {
+            try { it.close() } catch (_: IOException) {}
         }
         socket = null
 
-        Log.i(TAG, "↻ SPP session closed before ACK; reconnecting to acknowledge ${ids.size} file(s)")
+        Log.i(TAG, "↻ SPP download session closed; reconnecting to acknowledge ${ids.size} file(s)")
         val reconnect = XiaomiBandClassicConnection(context, credentials)
         return try {
             val auth = reconnect.authenticate()
