@@ -264,17 +264,7 @@ class XiaomiBandClassicConnection(
             }
         }
         if (sock == null) {
-                Log.w(TAG, "[round $round] Insecure RFCOMM connect failed, retrying with a secure socket")
-                sock = openSocket(device, insecure = false)
-            }
-            if (sock != null) break
-            if (round < MAX_CONNECT_ROUNDS) {
-                Log.w(TAG, "[round $round] Both insecure and secure failed, backing off ${CONNECT_ROUND_BACKOFF_MS}ms before retrying")
-                Thread.sleep(CONNECT_ROUND_BACKOFF_MS)
-            }
-        }
-        if (sock == null) {
-            failAndClose("SPP socket.connect() failed after $MAX_CONNECT_ROUNDS rounds (insecure+secure each) - is the band paired in Android Bluetooth settings?")
+            failAndClose("SPP socket.connect() failed after $MAX_CONNECT_ROUNDS secure RFCOMM rounds - is the band paired in Android Bluetooth settings?")
             return
         }
 
