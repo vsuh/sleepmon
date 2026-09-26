@@ -178,7 +178,7 @@ object SyncHelper {
             )
         }
     }
-    private const val TAG = "SyncHelper"
+    private const val TAG = "SleepMonitor-v37/SyncHelper"
     private const val FALLBACK_TIMEOUT_SECONDS = 5L
 
     /**
