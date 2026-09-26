@@ -118,10 +118,11 @@ class XiaomiBandClassicConnection(
         /**
          * How long to wait, after the last ANY inbound packet, before deciding the
          * fetch is done. In the real capture the offer arrives ~0.3s after the trigger
-         * and the whole file transfer completes within ~1s, but we keep a generous
-         * margin for real-world variance (weaker signal, more accumulated data, etc).
+         * and the whole file transfer completes within ~1s, but we keep a 5-second
+         * margin for real-world variance (weaker signal, more accumulated data, etc),
+         * while avoiding a long idle period before the deferred backend ACK.
          */
-        private const val FETCH_IDLE_TIMEOUT_MS = 15_000L
+        private const val FETCH_IDLE_TIMEOUT_MS = 5_000L
         /** Overall cap on a single fetchActivityData() call. */
         private const val FETCH_OVERALL_TIMEOUT_MS = 60_000L
 
