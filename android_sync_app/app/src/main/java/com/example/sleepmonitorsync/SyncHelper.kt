@@ -110,21 +110,6 @@ object SyncHelper {
 
             SyncQueue.clear(context)
             onStatus("═══ Xiaomi sync завершён: ${pending.days.size} дн.; очередь очищена")
-            }
-
-            val (activeUrl, cookie) = resolveActiveServer(primaryUrl, backupUrl, pin, onStatus)
-            for (day in days.sortedBy { it.date }) {
-                postToServer(activeUrl, cookie, day.date.toString(), day.sleepHours, day.pulseAvgDay,
-                    day.pulseAvgSleep, day.stepsTotal, day.sleepAwakenings)
-                onStatus("✅ ${day.date}: шаги ${day.stepsTotal}, пульс ${day.pulseAvgDay}")
-            }
-
-            if (!connection.acknowledgeFetchedFiles()) {
-                onStatus("⚠️ Данные загружены, но подтверждение файлов браслету не удалось; они будут предложены повторно.")
-                return@withExclusiveSppOperation false
-            }
-
-            onStatus("═══ Xiaomi sync завершён: ${days.size} дн.")
             return@withExclusiveSppOperation true
         } catch (e: Exception) {
             Log.e(TAG, "❌ Xiaomi sync failed: ${e.message}", e)
