@@ -1,9 +1,6 @@
 package com.example.sleepmonitorsync
 
 import android.Manifest
-import android.app.DatePickerDialog
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -14,7 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,11 +27,9 @@ import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import com.example.sleepmonitorsync.band.BandCredentials
-import com.example.sleepmonitorsync.band.XiaomiBandTester
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
 
@@ -46,7 +40,7 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v33 (26.09.2026) - без заведомого Broken pipe перед deferred ACK"
+        const val APP_BUILD_TAG = "v34 (26.09.2026) - упрощённый экран без debug и range-кнопок"
     }
 
     private val permissions = setOf(
@@ -83,52 +77,11 @@ class MainActivity : ComponentActivity() {
         )
         var appPin by mutableStateOf(prefs.getString("appPin", defaultAppPin) ?: "")
 
-        val today = LocalDate.now()
-        var rangeFrom by mutableStateOf(today.minusDays(7))
-        var rangeTo by mutableStateOf(today)
-
         val requestPermissions = registerForActivityResult(requestPermissionActivityContract) { granted ->
             if (granted.containsAll(permissions)) {
                 status = "Permissions granted! Ready to sync."
             } else {
                 status = "Permissions not fully granted."
-            }
-        }
-
-        var bleStatus by mutableStateOf("")
-        var bleRunning by mutableStateOf(false)
-        var pendingTransport: (suspend () -> String)? = null
-
-        fun runBandTest(transport: suspend () -> String) {
-            bleRunning = true
-            bleStatus = "Подключаюсь к браслету..."
-            CoroutineScope(Dispatchers.Main).launch {
-                bleStatus = transport()
-                bleRunning = false
-            }
-        }
-
-        val requestBluetoothPermissions = registerForActivityResult(
-            ActivityResultContracts.RequestMultiplePermissions()
-        ) { grantedMap ->
-            val connectGranted = grantedMap[Manifest.permission.BLUETOOTH_CONNECT] == true
-            val transport = pendingTransport
-            pendingTransport = null
-            if (connectGranted && transport != null) {
-                runBandTest(transport)
-            } else {
-                bleStatus = "❌ Нет разрешения BLUETOOTH_CONNECT"
-            }
-        }
-
-        fun requestAndRunBandTest(transport: suspend () -> String) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                pendingTransport = transport
-                requestBluetoothPermissions.launch(
-                    arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
-                )
-            } else {
-                runBandTest(transport)
             }
         }
 
@@ -146,16 +99,6 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
             var showSettings by remember { mutableStateOf(false) }
 
-            fun showDatePicker(initial: LocalDate, onPicked: (LocalDate) -> Unit) {
-                DatePickerDialog(
-                    context,
-                    { _, year, month, dayOfMonth ->
-                        onPicked(LocalDate.of(year, month + 1, dayOfMonth))
-                    },
-                    initial.year, initial.monthValue - 1, initial.dayOfMonth
-                ).show()
-            }
-
             if (showSettings) {
                 SettingsScreen(
                     serverUrl = serverUrl,
@@ -164,11 +107,6 @@ class MainActivity : ComponentActivity() {
                     onServerUrlBackupChange = { serverUrlBackup = it; prefs.edit().putString("serverUrlBackup", it).apply() },
                     appPin = appPin,
                     onAppPinChange = { appPin = it; prefs.edit().putString("appPin", it).apply() },
-                    onCheckConnection = {
-                        requestAndRunBandTest { XiaomiBandTester.testAuthSpp(context) }
-                    },
-                    bleRunning = bleRunning,
-                    bleStatus = bleStatus,
                     onBack = { showSettings = false },
                 )
                 return@setContent
@@ -213,64 +151,9 @@ class MainActivity : ComponentActivity() {
                     Text("Sync Now")
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
-                Text("Массовая синхронизация за диапазон дат")
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(onClick = {
-                        showDatePicker(rangeFrom) { picked -> rangeFrom = picked }
-                    }) {
-                        Text("От: $rangeFrom")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    OutlinedButton(onClick = {
-                        showDatePicker(rangeTo) { picked -> rangeTo = picked }
-                    }) {
-                        Text("До: $rangeTo")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Button(onClick = {
-                    CoroutineScope(Dispatchers.Main).launch {
-                        status = "Syncing range..."
-                        withHealthPermissions { client ->
-                            SyncHelper.performSyncRange(client, serverUrl, serverUrlBackup, appPin, rangeFrom, rangeTo) { newStatus ->
-                                status = newStatus
-                            }
-                        }
-                    }
-                }) {
-                    Text("Sync Range")
-                }
-
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(status)
 
-                Spacer(modifier = Modifier.height(32.dp))
-                Text("Xiaomi Band (debug)")
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    enabled = !bleRunning,
-                    onClick = {
-                        requestAndRunBandTest { XiaomiBandTester.testActivityFetch(context) }
-                    }
-                ) {
-                    Text(if (bleRunning) "..." else "Загрузить данные")
-                }
-                if (bleStatus.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(bleStatus)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(onClick = {
-                        val clipboard = context.getSystemService(ClipboardManager::class.java)
-                        clipboard.setPrimaryClip(ClipData.newPlainText("Xiaomi Band result", bleStatus))
-                    }) {
-                        Text("Копировать результат")
-                    }
-                }
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
@@ -285,9 +168,6 @@ private fun SettingsScreen(
     onServerUrlBackupChange: (String) -> Unit,
     appPin: String,
     onAppPinChange: (String) -> Unit,
-    onCheckConnection: () -> Unit,
-    bleRunning: Boolean,
-    bleStatus: String,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -345,17 +225,6 @@ private fun SettingsScreen(
                 "переизвлеките его через xiaomi-extractor и вставьте сюда, без пересборки приложения.",
             style = MaterialTheme.typography.bodySmall,
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            enabled = !bleRunning,
-            onClick = onCheckConnection,
-        ) {
-            Text(if (bleRunning) "..." else "Проверить подключение")
-        }
-        if (bleStatus.isNotBlank()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(bleStatus)
-        }
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = bandMac,
