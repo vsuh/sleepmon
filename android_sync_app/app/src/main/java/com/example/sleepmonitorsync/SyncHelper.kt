@@ -72,9 +72,44 @@ object SyncHelper {
             onStatus("📊 Получено файлов: ${result.filesReceived}, минутных записей: ${result.perMinuteSamples.size}")
 
             val days = aggregateBandSamples(result.perMinuteSamples, result.dailySummaries, result.sleepSummaries)
-            if (days.isEmpty()) {
-                onStatus("ℹ️ Браслет не вернул новых распознанных данных")
+            if (days.isNotEmpty()) {
+                SyncQueue.enqueue(
+                    context,
+                    days.map { day ->
+                        SyncQueue.PendingDay(
+                            date = day.date.toString(),
+                            sleepHours = day.sleepHours,
+                            pulseAvgDay = day.pulseAvgDay,
+                            pulseAvgSleep = day.pulseAvgSleep,
+                            stepsTotal = day.stepsTotal,
+                            sleepAwakenings = day.sleepAwakenings,
+                        )
+                    },
+                    connection.pendingAckFileIds(),
+                )
+                onStatus("💾 Локальная очередь: сохранено ${days.size} дн.")
+            }
+
+            val pending = SyncQueue.load(context)
+            if (pending.days.isEmpty()) {
+                onStatus("ℹ️ Нет данных для отправки на сервер")
                 return@withExclusiveSppOperation true
+            }
+
+            val (activeUrl, cookie) = resolveActiveServer(primaryUrl, backupUrl, pin, onStatus)
+            for (day in pending.days.sortedBy { it.date }) {
+                postToServer(activeUrl, cookie, day.date, day.sleepHours, day.pulseAvgDay,
+                    day.pulseAvgSleep, day.stepsTotal, day.sleepAwakenings)
+                onStatus("✅ ${day.date}: шаги ${day.stepsTotal}, пульс ${day.pulseAvgDay}")
+            }
+
+            if (!connection.acknowledgeFileIds(pending.fileIds)) {
+                onStatus("⚠️ Сервер принял данные, но ACK браслету не удалось; локальная очередь сохранена для повтора.")
+                return@withExclusiveSppOperation false
+            }
+
+            SyncQueue.clear(context)
+            onStatus("═══ Xiaomi sync завершён: ${pending.days.size} дн.; очередь очищена")
             }
 
             val (activeUrl, cookie) = resolveActiveServer(primaryUrl, backupUrl, pin, onStatus)
