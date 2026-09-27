@@ -71,7 +71,7 @@ def parse_note(content: str | None) -> dict:
     """
     result = {
         "well_being": 9,
-        "sleep_quality": 0,
+        "sleep_quality": 9,
         "alco": False,
         "notes": "",
         "sleep_hours": 0,
