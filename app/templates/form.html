@@ -64,8 +64,8 @@
 
             <div class="form-group">
                 <label>Качество сна (0-9):</label>
-                <input type="range" name="sleep_quality" min="0" max="9" value="{{ data.sleep_quality }}" oninput="this.nextElementSibling.value = this.value">
-                <output>{{ data.sleep_quality }}</output>
+                <input type="range" name="sleep_quality" min="0" max="9" value="{{ data.sleep_quality|default(9) }}" oninput="this.nextElementSibling.value = this.value">
+                <output>{{ data.sleep_quality|default(9) }}</output>
             </div>
 
             <div class="form-group">
