@@ -38,7 +38,7 @@ object SyncHelper {
         onStatus: (String) -> Unit
     ): Boolean {
         return XiaomiBandClassicConnection.withExclusiveSppOperation {
-            Log.i(TAG, "=== v40 (26.09.2026) - SyncHelper ===")
+            Log.i(TAG, "=== v42 (27.09.2026) - SyncHelper ===")
             Log.i(TAG, "Xiaomi SPP operation lock acquired")
             val credentials = BandCredentials.load(context)
         val authKey = credentials.authKeyHex.trim().removePrefix("0x").removePrefix("0X")
@@ -171,10 +171,28 @@ object SyncHelper {
             val hr = daySamples.mapNotNull { it.heartRate?.takeIf { bpm -> bpm > 0 } }
             val pulse = if (hr.isNotEmpty()) hr.average().toInt() else (summary?.hrAvg ?: 0)
 
+            // Sleep summaries are keyed by wake-up date, so the sleep interval may
+            // start on the previous calendar day. Use all decoded minute samples,
+            // not only daySamples, to include the pre-midnight part of the night.
+            val sleepPulse = if (sleep != null) {
+                val sleepStart = sleep.bedTimeSeconds.toLong()
+                val wakeTime = sleep.wakeupTimeSeconds.toLong()
+                unique.asSequence()
+                    .filter { it.timestampSeconds.toLong() >= sleepStart && it.timestampSeconds.toLong() < wakeTime }
+                    .mapNotNull { it.heartRate?.takeIf { bpm -> bpm > 0 } }
+                    .toList()
+                    .let { values -> if (values.isNotEmpty()) values.average().toInt() else 0 }
+            } else {
+                0
+            }
+
+            Log.i(TAG, "📊 $date: pulse_day=$pulse BPM, pulse_sleep=$sleepPulse BPM")
+
             BandDayAggregate(
                 date = date,
                 stepsTotal = stepsTotal,
                 pulseAvgDay = pulse,
+                pulseAvgSleep = sleepPulse,
                 sleepHours = sleep?.sleepDurationMinutes?.div(60.0) ?: 0.0,
                 sleepAwakenings = sleep?.wakeCount ?: 0,
             )
