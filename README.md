@@ -38,7 +38,7 @@ Obsidian in Docker
 /app/vault
       │
       ▼
-/mnt/hdd/syncthing/AI.obsdn
+/path-to-projects/syncthing/AI.obsdn
 ```
 
 Принципиальные правила:
@@ -74,7 +74,7 @@ sleepmon/
 GitHub `vsuh/sleepmon` — центральный репозиторий. Дерево проекта для разработки находится внутри Obsidian vault:
 
 ```
-D:\Sync\AI.obsdn\10-projects\sleep-monitor
+C:\AI.obsdn\10-projects\sleep-monitor
 ```
 
 Именно в этом checkout выполняется разработка и изменения отражаются в GitHub.
@@ -82,7 +82,7 @@ D:\Sync\AI.obsdn\10-projects\sleep-monitor
 На Linux-сервере **HELOR** находится отдельный production checkout:
 
 ```
-~/vsuh-helor-conf/services/opt/sleepmon
+services/opt/sleepmon
 ```
 
 Этот каталог получает проект из GitHub и является **продуктовой средой**, в которой запускается Docker Compose.
@@ -91,7 +91,7 @@ D:\Sync\AI.obsdn\10-projects\sleep-monitor
 
 ```
 Obsidian vault checkout
-D:\Sync\AI.obsdn\10-projects\sleep-monitor
+C:\AI.obsdn\10-projects\sleep-monitor
         │
         ├── изменение
         ├── git add
@@ -103,7 +103,7 @@ D:\Sync\AI.obsdn\10-projects\sleep-monitor
                 │
                 ▼
 HELOR production checkout
-~/vsuh-helor-conf/services/opt/sleepmon
+services/opt/sleepmon
         │
         ├── git pull
         └── docker compose up -d --build app
@@ -118,7 +118,7 @@ HELOR production checkout
 Если production checkout ещё не создан:
 
 ```bash
-cd ~/vsuh-helor-conf/services/opt
+cd /path-2-prj/services/opt
 git clone https://github.com/vsuh/sleepmon.git sleepmon
 cd sleepmon
 ```
@@ -126,7 +126,7 @@ cd sleepmon
 Если checkout уже существует:
 
 ```bash
-cd ~/vsuh-helor-conf/services/opt/sleepmon
+cd /path-2-prj/services/opt/sleepmon
 git pull
 ```
 
@@ -139,7 +139,7 @@ cp .env.example .env
 Минимальный `.env`:
 
 ```env
-APP_PIN=1679
+APP_PIN=94519
 OBSIDIAN_BASE_URL=https://obsidian:27124
 OBSIDIAN_API_KEY=<ключ Local REST API>
 ```
@@ -180,15 +180,15 @@ Compose запускает два сервиса:
 - `obsidian` — Obsidian/Electron внутри контейнера;
 - `app` — FastAPI.
 
-В текущем `docker-compose.yml` vault внутри контейнера доступен по пути `/app/vault`, а на хосте это `/mnt/hdd/syncthing/AI.obsdn`.
+В текущем `docker-compose.yml` vault внутри контейнера доступен по пути `/app/vault`, а на хосте это `/path-to-projects/syncthing/AI.obsdn`.
 
 ```text
-host:      /mnt/hdd/syncthing/AI.obsdn
+host:      /path-to-projects/syncthing/AI.obsdn
 container: /app/vault
 
 obsidian:
   volume:
-    /mnt/hdd/syncthing/AI.obsdn:/app/vault:rw
+    /path-to-projects/syncthing/AI.obsdn:/app/vault:rw
   ports:
     8080:8080
     27124:27124
@@ -255,7 +255,7 @@ Android сохраняет значение `Set-Cookie` и передаёт е�
 ```bash
 curl -i -c cookies.txt \
   -X POST http://<server>:8000/login \
-  -d 'pin=1679'
+  -d 'pin=94519'
 ```
 
 При неправильном PIN сервер возвращает HTML страницы входа с сообщением об ошибке.
@@ -266,7 +266,7 @@ curl -i -c cookies.txt \
 
 Авторизация: cookie `session_pin`, полученная через `/login`.
 
-Content-Type: обычная HTML form encoding (`application/x-www-form-urlencoded`).
+Content-Type:  HTML form encoding (`application/x-www-form-urlencoded`).
 
 Параметры:
 
@@ -332,9 +332,6 @@ alco
 notes
 ```
 
-`sleep_quality` принимает только целое значение `0…9`.
-
-Для **новой записи** значение `sleep_quality` по умолчанию — **9**.
 
 `/save` предназначен для ручного редактирования и, в отличие от `/sync`, может изменять субъективные поля.
 
@@ -386,12 +383,12 @@ alco: false
 
 ### Поля пользователя
 
-- `well_being` — субъективное самочувствие;
+- `well_being` — субъективное самочувствие `0…9`;
 - `sleep_quality` — субъективное качество сна, целое `0…9`;
 - `alco` — был ли алкоголь;
-- текст под `## Заметки`.
+- текст примечания `## Заметки`.
 
-Для новой записи `sleep_quality=9`. Автоматическая синхронизация не меняет это поле.
+Для новой записи `well_being=9,sleep_quality=9,alco=false`. Автоматическая синхронизация не меняет эти поля.
 
 ---
 
@@ -403,13 +400,12 @@ APK собирается из каталога:
 android_sync_app/
 ```
 
-В этом проектном окружении APK **не собирается автоматически**; сборку выполняет разработчик локально.
 
 Windows:
 
 ```bat
 cd android_sync_app
-gradlew.bat assembleDebug
+gradlew.bat :app:assembleDebug
 ```
 
 Linux/macOS/WSL:
@@ -433,11 +429,11 @@ adb install -r app-debug.apk
 
 После установки нужно:
 
-1. Сопрячь браслет с Android в системных настройках Bluetooth.
+1. Сопрячь браслет с Android в системных настройках Bluetooth (это возможно после установки mi fitness, сопряжения браслета и удаления mi fitness).
 2. Запустить Sleep Monitor Sync.
-3. Предоставить требуемые разрешения Health Connect/Bluetooth.
+3. Предоставить требуемые разрешения (Bluetooth).
 4. Открыть **⚙ Настройки**.
-5. Заполнить параметры сервера и Xiaomi Band.
+5. Заполнить параметры сервера и Xiaomi Band (адрес сервера синхронизации, резервный адрес, app PIN, mac адрес и ключ авторизации браслета).
 6. Сохранить ключ браслета.
 7. Нажать **Sync Now** и проверить logcat.
 
@@ -470,7 +466,7 @@ http://192.168.2.2:8000
 Текущий встроенный default:
 
 ```
-https://sm.vsuh.duckdns.org:912
+https://your.ddns.org:999
 ```
 
 Если основной сервер не отвечает, приложение пробует резервный.
@@ -482,7 +478,7 @@ https://sm.vsuh.duckdns.org:912
 Текущий встроенный default:
 
 ```
-1679
+APP_PIN=94519
 ```
 
 Если `APP_PIN` на сервере изменён, это значение также нужно изменить в APK через **Настройки → App PIN**.
@@ -518,16 +514,15 @@ Bluetooth MAC конкретного браслета.
 Общий надёжный принцип:
 
 1. Сначала привязать браслет в официальном **Mi Fitness**.
-2. Получить из данных/логов Mi Fitness значение pairing key / `encryptKey` / `token`, в зависимости от версии приложения и устройства.
+2. Получить с помощью [xiaomi-extractor](https://github.com/piotrmachowski/xiaomi-cloud-tokens-extractor) encription key (TOKEN).
 3. Убедиться, что это значение содержит 32 hex-символа.
 4. Ввести его в **Настройки → Xiaomi Band → Ключ авторизации**.
 5. Ввести MAC этого же браслета.
 6. Нажать **Сохранить ключ браслета**.
-7. Перед подключением остановить Mi Fitness, чтобы оно не удерживало Bluetooth-соединение.
+7. Перед подключением удалить Mi Fitness, чтобы оно не удерживало Bluetooth-соединение.
 
-Для некоторых Android-версий Mi Fitness встречается способ включить диагностические логи и искать `encryptKey` в `XiaomiFit.main.log`; конкретные пункты меню зависят от версии приложения. Существуют также инструменты, извлекающие `encryptKey` из sandbox Mi Fitness. citeturn1search0turn1search2turn1search5
 
-**Auth key — секрет, аналогичный паролю. Не помещать его в Git, README, issue или публичные логи.** При отвязке/перепривязке устройства ключ может стать недействительным; тогда его нужно получить заново. citeturn1search1turn1search5
+**Encription key (TOKEN) — секрет, аналогичный паролю. Не помещать его в Git, README, issue или публичные логи.** При отвязке/перепривязке устройства к Mi Fitness, ключ пересоздается тогда его нужно получить заново. 
 
 ---
 
@@ -537,10 +532,14 @@ Bluetooth MAC конкретного браслета.
 
 1. Убедиться, что браслет включён.
 2. Убедиться, что он сопряжён с Android.
-3. Остановить Mi Fitness, если оно активно соединено с браслетом.
+3. Удалить Mi Fitness.
 4. Открыть Sleep Monitor Sync.
 5. Проверить **Настройки**.
-6. Нажать **Sync Now**.
+6. Запустить logcat
+```
+adb logcat -c && adb logcat -s SyncWorker SyncHelper XiaomiBandClassic
+```
+1. Нажать **Sync Now**.
 
 Нормальная последовательность в logcat:
 
@@ -550,13 +549,7 @@ Auth handshake complete
 Band offered N file(s)
 Server accepted data ... (HTTP 200)
 Acknowledged N activity file(s) on fresh SPP session
-═══ Xiaomi sync session завершён
-```
-
-Основные logcat tags:
-
-```bash
-adb logcat -s SyncWorker SyncHelper XiaomiBandClassic
+═══ Xiaomi sync session finished
 ```
 
 В начале операции должен быть виден build tag, например:
@@ -590,7 +583,7 @@ filesDir/xiaomi_sync_queue.json
 На компьютере разработки:
 
 ```text
-D:\Sync\AI.obsdn\10-projects\sleep-monitor
+cd /d C:\AI.obsdn\10-projects\sleep-monitor
 ```
 
 После изменения:
@@ -605,7 +598,7 @@ git push
 На HELOR:
 
 ```bash
-cd ~/vsuh-helor-conf/services/opt/sleepmon
+cd /path-2-prj/services/opt/sleepmon
 git pull
 docker compose up -d --build app
 ```
@@ -629,7 +622,6 @@ docker compose up -d app
 docker compose up -d --build app
 ```
 
-**Критично:** не запускать сборку в старом production checkout до `git pull`.
 
 ---
 
@@ -651,7 +643,7 @@ docker compose up -d --build app
 Логи:
 
 ```bash
-cd ~/vsuh-helor-conf/services/opt/sleepmon
+cd /path-2-prj/services/opt/sleepmon
 docker compose logs -f app
 ```
 
