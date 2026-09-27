@@ -71,6 +71,7 @@ def parse_note(content: str | None) -> dict:
     """
     result = {
         "well_being": 9,
+        "sleep_quality": 0,
         "alco": False,
         "notes": "",
         "sleep_hours": 0,
@@ -161,6 +162,7 @@ async def index(request: Request, background_tasks: BackgroundTasks, date: str =
         "pulse_avg_sleep": "",
         "steps_total": "",
         "well_being": 9,
+        "sleep_quality": 0,
         "alco": False,
         "notes": ""
     }
@@ -204,13 +206,16 @@ async def save(request: Request,
                pulse_avg_sleep: int = Form(0),
                steps_total: int = Form(0),
                well_being: int = Form(9),
+               sleep_quality: int = Form(0),
                alco: bool = Form(False),
                notes: str = Form("")):
     if not verify_session(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
+    if not 0 <= sleep_quality <= 9:
+        raise HTTPException(status_code=422, detail="sleep_quality must be between 0 and 9")
 
     logger.info(f"/save called for {date}: sleep={sleep_hours}h, pulse_day={pulse_avg_day}, "
-                f"pulse_sleep={pulse_avg_sleep}, steps={steps_total}, well_being={well_being}, alco={alco}")
+                f"pulse_sleep={pulse_avg_sleep}, steps={steps_total}, well_being={well_being}, sleep_quality={sleep_quality}, alco={alco}")
 
     # Sleep-phase fields (sleep_light_min/deep/rem/awake) aren't part of this
     # form — they're populated by /sync from Health Connect. Read the current
@@ -234,6 +239,7 @@ async def save(request: Request,
         "steps_total": steps_total,
         "sleep_awakenings": existing["sleep_awakenings"],
         "well_being": well_being,
+        "sleep_quality": sleep_quality,
         "alco": alco
     }
 
@@ -270,7 +276,7 @@ async def sync_endpoint(request: Request,
     the existing note:
 
     - `alco` and free-text `notes` are NEVER touched here (user-owned).
-    - `well_being` is preserved unless it's still unset (0).
+    - `well_being` and `sleep_quality` are preserved: both are subjective user-owned fields and are never changed by automatic sync.
     - `sleep_hours` is "fill-once": only written when the existing value is 0,
       and only with a non-zero incoming value. Once a real value is recorded,
       sync will never overwrite it again (can't "re-measure" sleep mid-day).
@@ -338,6 +344,7 @@ async def sync_endpoint(request: Request,
         "steps_total": final_steps_total,
         "sleep_awakenings": final_sleep_awakenings,
         "well_being": well_being,
+        "sleep_quality": existing["sleep_quality"],
         "alco": existing["alco"]
     }
 
