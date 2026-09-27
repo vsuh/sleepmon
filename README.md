@@ -139,7 +139,7 @@ cp .env.example .env
 Минимальный `.env`:
 
 ```env
-APP_PIN=94519
+APP_PIN=<ваш PIN>
 OBSIDIAN_BASE_URL=https://obsidian:27124
 OBSIDIAN_API_KEY=<ключ Local REST API>
 ```
@@ -255,7 +255,7 @@ Android сохраняет значение `Set-Cookie` и передаёт е�
 ```bash
 curl -i -c cookies.txt \
   -X POST http://<server>:8000/login \
-  -d 'pin=94519'
+  -d 'pin=<ваш PIN>'
 ```
 
 При неправильном PIN сервер возвращает HTML страницы входа с сообщением об ошибке.
@@ -478,7 +478,7 @@ https://your.ddns.org:999
 Текущий встроенный default:
 
 ```
-APP_PIN=94519
+APP_PIN=<ваш PIN>
 ```
 
 Если `APP_PIN` на сервере изменён, это значение также нужно изменить в APK через **Настройки → App PIN**.
