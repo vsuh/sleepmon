@@ -146,6 +146,7 @@ sleep_deep_min: 0
 sleep_rem_min: 0
 sleep_awake_min: 0
 well_being: 0
+sleep_quality: 0
 alco: false
 ---
 ```
