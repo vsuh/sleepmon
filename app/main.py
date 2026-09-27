@@ -83,6 +83,7 @@ def parse_note(content: str | None) -> dict:
         if len(parts) >= 3:
             frontmatter = yaml.safe_load(parts[1]) or {}
             result["well_being"] = frontmatter.get("well_being", 9)
+            result["sleep_quality"] = frontmatter.get("sleep_quality", 9)
             result["alco"] = frontmatter.get("alco", False)
             result["notes"] = parts[2].replace("## Заметки\n\n", "").strip()
             result["sleep_hours"] = frontmatter.get("sleep_hours", 0)
