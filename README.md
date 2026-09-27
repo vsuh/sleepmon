@@ -35,6 +35,9 @@ FastAPI :8000
 Obsidian in Docker
       │
       ▼
+/app/vault
+      │
+      ▼
 /mnt/hdd/syncthing/AI.obsdn
 ```
 
@@ -177,12 +180,15 @@ Compose запускает два сервиса:
 - `obsidian` — Obsidian/Electron внутри контейнера;
 - `app` — FastAPI.
 
-В текущем `docker-compose.yml`:
+В текущем `docker-compose.yml` vault внутри контейнера доступен по пути `/app/vault`, а на хосте это `/mnt/hdd/syncthing/AI.obsdn`.
 
-```
+```text
+host:      /mnt/hdd/syncthing/AI.obsdn
+container: /app/vault
+
 obsidian:
   volume:
-    /mnt/hdd/syncthing/AI.obsdn:/vault:rw
+    /mnt/hdd/syncthing/AI.obsdn:/app/vault:rw
   ports:
     8080:8080
     27124:27124
@@ -194,7 +200,7 @@ obsidian:
 
 1. Запустить `obsidian`.
 2. Через VNC/noVNC открыть Obsidian.
-3. Открыть vault, смонтированный как `/vault`.
+3. Открыть vault, смонтированный внутри контейнера как `/app/vault`.
 4. Установить/включить Community Plugin **Local REST API**.
 5. Настроить Local REST API на порт `27124`.
 6. Bind Address должен быть `0.0.0.0`, чтобы контейнер `app` мог обратиться к нему.
