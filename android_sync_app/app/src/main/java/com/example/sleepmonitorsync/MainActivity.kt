@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
@@ -41,8 +43,8 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v40 (26.09.2026) - лог завершения сеанса"
-        const val LOG_TAG = "SleepMonitor-v40"
+        const val APP_BUILD_TAG = "v41 (27.09.2026) - экран persistent queue"
+        const val LOG_TAG = "SleepMonitor-v41"
     }
 
     private val permissions = setOf(
@@ -101,6 +103,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             val context = LocalContext.current
             var showSettings by remember { mutableStateOf(false) }
+            var queue by remember { mutableStateOf<SyncQueue.Pending?>(null) }
+            val queueDateFormatter = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy") }
+
+            suspend fun refreshQueue() {
+                queue = SyncQueue.load(context)
+            }
+
+            LaunchedEffect(Unit) {
+                refreshQueue()
+            }
 
             if (showSettings) {
                 SettingsScreen(
@@ -146,8 +158,12 @@ class MainActivity : ComponentActivity() {
                 Button(onClick = {
                     CoroutineScope(Dispatchers.Main).launch {
                         status = "Синхронизация с Xiaomi Band..."
-                        SyncHelper.performBandSync(this@MainActivity, serverUrl, serverUrlBackup, appPin) { newStatus ->
-                            status = newStatus
+                        try {
+                            SyncHelper.performBandSync(this@MainActivity, serverUrl, serverUrlBackup, appPin) { newStatus ->
+                                status = newStatus
+                            }
+                        } finally {
+                            refreshQueue()
                         }
                     }
                 }) {
@@ -157,7 +173,49 @@ class MainActivity : ComponentActivity() {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(status)
 
+                Spacer(modifier = Modifier.height(24.dp))
+                SyncQueueStatus(
+                    pending = queue,
+                    dateFormatter = queueDateFormatter,
+                )
+
                 Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SyncQueueStatus(
+    pending: SyncQueue.Pending?,
+    dateFormatter: DateTimeFormatter,
+) {
+    val days = pending?.days.orEmpty()
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "Очередь синхронизации: ${days.size}",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+
+        if (days.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            days.asReversed().forEach { day ->
+                val displayDate = runCatching {
+                    LocalDate.parse(day.date).format(dateFormatter)
+                }.getOrDefault(day.date)
+                Text(
+                    displayDate,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "${"%.1f".format(day.sleepHours)} | ${day.pulseAvgDay} | " +
+                        "${day.pulseAvgSleep} | ${day.stepsTotal} | ${day.sleepAwakenings}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
             }
         }
     }
