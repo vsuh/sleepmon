@@ -162,7 +162,7 @@ async def index(request: Request, background_tasks: BackgroundTasks, date: str =
         "pulse_avg_sleep": "",
         "steps_total": "",
         "well_being": 9,
-        "sleep_quality": 0,
+        "sleep_quality": 9,
         "alco": False,
         "notes": ""
     }
@@ -206,7 +206,7 @@ async def save(request: Request,
                pulse_avg_sleep: int = Form(0),
                steps_total: int = Form(0),
                well_being: int = Form(9),
-               sleep_quality: int = Form(0),
+               sleep_quality: int = Form(9),
                alco: bool = Form(False),
                notes: str = Form("")):
     if not verify_session(request):
