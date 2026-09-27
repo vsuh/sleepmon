@@ -146,7 +146,7 @@ sleep_deep_min: 0
 sleep_rem_min: 0
 sleep_awake_min: 0
 well_being: 0
-sleep_quality: 0
+sleep_quality: 9
 alco: false
 ---
 ```
@@ -264,6 +264,7 @@ secure SPP → auth → files → /sync HTTP 200 → fresh SPP → ACK → sessi
 
 Интерфейс формы также явно использует `9` как fallback для нового значения `sleep_quality`, чтобы новая запись не отображалась с нулевой оценкой.
 Backend defaults for `parse_note()`, the main form data, and `/save` are all `9`; the form control also has an explicit `9` fallback.
+Дополнительно `parse_note()` теперь читает существующее `sleep_quality` из frontmatter и использует `9` только при отсутствии поля, поэтому `/sync` действительно сохраняет уже введённую субъективную оценку.
 ## 11. Изменение схемы — sleep_quality
 
 В дневную запись добавлено субъективное поле `sleep_quality` со значением `0…9`.
