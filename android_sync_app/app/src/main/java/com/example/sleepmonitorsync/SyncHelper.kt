@@ -38,7 +38,7 @@ object SyncHelper {
         onStatus: (String) -> Unit
     ): Boolean {
         return XiaomiBandClassicConnection.withExclusiveSppOperation {
-            Log.i(TAG, "=== v42 (27.09.2026) - SyncHelper ===")
+            Log.i(TAG, "=== v44 (28.09.2026) - auth и sleep diagnostics ===")
             Log.i(TAG, "Xiaomi SPP operation lock acquired")
             val credentials = BandCredentials.load(context)
         val authKey = credentials.authKeyHex.trim().removePrefix("0x").removePrefix("0X")
@@ -320,7 +320,14 @@ object SyncHelper {
             val loginBody = FormBody.Builder().add("pin", pin).build()
             val loginReq = Request.Builder().url("$url/login").post(loginBody).build()
             val loginResp = okClient.newCall(loginReq).execute()
-            loginResp.header("Set-Cookie") ?: ""
+            val cookie = loginResp.header("Set-Cookie")
+                ?.substringBefore(";")
+                ?.takeIf { it.startsWith("session_pin=") }
+                ?: throw Exception("Login failed: HTTP " + loginResp.code + ", session cookie missing")
+            if (loginResp.code != 302) {
+                throw Exception("Login failed: HTTP " + loginResp.code)
+            }
+            cookie
         }
 
     /**
