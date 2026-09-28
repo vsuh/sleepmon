@@ -336,6 +336,8 @@ object SyncHelper {
             val cookie = cookieStore.firstOrNull { it.name == "session_pin" }?.let {
                 "session_pin=" + it.value
             } ?: throw Exception("Login failed: HTTP " + loginResp.code + ", session cookie missing")
+            loginResp.close()
+            cookie
         }
 
     /**
