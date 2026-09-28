@@ -311,8 +311,18 @@ object SyncHelper {
 
     private suspend fun login(url: String, pin: String): String =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val cookieStore = mutableListOf<Cookie>()
             val okClient = OkHttpClient.Builder()
-                .followRedirects(false)
+                .followRedirects(true)
+                .cookieJar(object : CookieJar {
+                    override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+                        cookieStore.removeAll { it.name == "session_pin" && it.domain == url.host }
+                        cookieStore.addAll(cookies)
+                    }
+
+                    override fun loadForRequest(url: HttpUrl): List<Cookie> =
+                        cookieStore.filter { it.matches(url) }
+                })
                 .connectTimeout(FALLBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .readTimeout(FALLBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .callTimeout(FALLBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -320,14 +330,9 @@ object SyncHelper {
             val loginBody = FormBody.Builder().add("pin", pin).build()
             val loginReq = Request.Builder().url("$url/login").post(loginBody).build()
             val loginResp = okClient.newCall(loginReq).execute()
-            val cookie = loginResp.header("Set-Cookie")
-                ?.substringBefore(";")
-                ?.takeIf { it.startsWith("session_pin=") }
-                ?: throw Exception("Login failed: HTTP " + loginResp.code + ", session cookie missing")
-            if (loginResp.code != 302) {
-                throw Exception("Login failed: HTTP " + loginResp.code)
-            }
-            cookie
+            val cookie = cookieStore.firstOrNull { it.name == "session_pin" }?.let {
+                "session_pin=" + it.value
+            } ?: throw Exception("Login failed: HTTP " + loginResp.code + ", session cookie missing")
         }
 
     /**
