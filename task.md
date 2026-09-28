@@ -363,3 +363,12 @@ Backend уже сохраняет `sleep_quality` в frontmatter через `/sa
 - Build tag Android повышен до `v44 (28.09.2026) - auth и sleep diagnostics`.
 
 По фактическому Logcat v43: браслет в последней сессии предложил только daily-файлы (`subtype=0`), включая daily summary v5/detailType=1; sleep-файл (`subtype=8`) не был предложен. Поэтому `pulse_sleep=0` в этом запуске вызван отсутствием распарсенного sleep window, а не вычислением среднего HR внутри найденного окна.
+
+## 20. Android — login cookie через reverse-proxy redirect
+
+v44 показал HTTP 200 и отсутствие cookie на `/login`, хотя backend при правильном PIN возвращает 302 с `session_pin`; внешний reverse proxy завершает redirect, поэтому проверка только HTTP 302 была несовместима с production-схемой.
+
+В v45 `SyncHelper.login()` использует OkHttp `CookieJar` и разрешает redirect. Успешная авторизация определяется по фактически сохранённой `session_pin` cookie, независимо от того, завершился `/login` на 302 или конечном 200.
+
+- Build tag повышен до `v45 (28.09.2026) - auth cookie через redirect`.
+- После изменения Android-кода APK локально не собирался; сборку выполняет пользователь.
