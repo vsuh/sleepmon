@@ -43,8 +43,8 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v48 (28.09.2026) - auth response diagnostics"
-        const val LOG_TAG = "SleepMonitor-v48"
+        const val APP_BUILD_TAG = "v49 (28.09.2026) - сохранение пользовательских настроек"
+        const val LOG_TAG = "SleepMonitor-v49"
     }
 
     private val permissions = setOf(
@@ -64,6 +64,9 @@ class MainActivity : ComponentActivity() {
         val defaultServerUrl = "http://192.168.2.2:8000"
         val defaultServerUrlBackup = "https://sm.vsuh.duckdns.org:912"
         val defaultAppPin = "1679"
+
+        // Defaults are write-once: an existing user value must never be overwritten
+        // when Activity is recreated or a new APK is installed over the existing app.
         prefs.edit().apply {
             if (!prefs.contains("serverUrl")) putString("serverUrl", defaultServerUrl)
             if (!prefs.contains("serverUrlBackup")) putString("serverUrlBackup", defaultServerUrlBackup)
