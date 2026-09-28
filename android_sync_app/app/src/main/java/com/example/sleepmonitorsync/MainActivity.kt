@@ -43,8 +43,8 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v45 (28.09.2026) - auth cookie через redirect"
-        const val LOG_TAG = "SleepMonitor-v45"
+        const val APP_BUILD_TAG = "v46 (28.09.2026) - auth cookie compile fix"
+        const val LOG_TAG = "SleepMonitor-v46"
     }
 
     private val permissions = setOf(
