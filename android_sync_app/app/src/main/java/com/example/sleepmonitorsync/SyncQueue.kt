@@ -45,10 +45,25 @@ object SyncQueue {
     ) = withContext(Dispatchers.IO) {
         synchronized(this@SyncQueue) {
             val old = readLocked(context)
-            val mergedDays = (old.days + days).associateBy { it.date }.values.sortedBy { it.date }
+            val newByDate = days.associateBy { it.date }.toMutableMap()
+            val mergedDays = old.days.map { existing ->
+                val incoming = newByDate.remove(existing.date)
+                if (incoming == null) {
+                    existing
+                } else {
+                    existing.copy(
+                        sleepHours = if (existing.sleepHours > 0.0) existing.sleepHours else incoming.sleepHours,
+                        pulseAvgDay = incoming.pulseAvgDay,
+                        pulseAvgSleep = if (existing.pulseAvgSleep > 0) existing.pulseAvgSleep else incoming.pulseAvgSleep,
+                        stepsTotal = incoming.stepsTotal,
+                        sleepAwakenings = if (existing.sleepHours > 0.0) existing.sleepAwakenings else incoming.sleepAwakenings,
+                    )
+                }
+            } + newByDate.values
+            val sortedDays = mergedDays.sortedBy { it.date }
             val mergedIds = (old.fileIds + fileIds)
                 .distinctBy { it.toHex() }
-            writeLocked(context, Pending(mergedDays, mergedIds))
+            writeLocked(context, Pending(sortedDays, mergedIds))
         }
     }
 
