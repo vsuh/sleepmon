@@ -333,9 +333,13 @@ object SyncHelper {
             val loginBody = FormBody.Builder().add("pin", pin).build()
             val loginReq = Request.Builder().url("$url/login").post(loginBody).build()
             val loginResp = okClient.newCall(loginReq).execute()
+            val setCookieHeader = loginResp.header("Set-Cookie")
+            val finalUrl = loginResp.request.url
+            val bodyPreview = loginResp.peekBody(512).string().replace("\n", " ").replace("\r", " ")
+            Log.d(LOG_TAG, "Login response: HTTP ${loginResp.code}, finalUrl=$finalUrl, setCookie=${setCookieHeader != null}, body=$bodyPreview")
             val cookie = cookieStore.firstOrNull { it.name == "session_pin" }?.let {
                 "session_pin=" + it.value
-            } ?: throw Exception("Login failed: HTTP " + loginResp.code + ", session cookie missing")
+            } ?: throw Exception("Login failed: HTTP " + loginResp.code + ", finalUrl=" + finalUrl + ", session cookie missing")
             loginResp.close()
             cookie
         }
