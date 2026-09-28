@@ -236,7 +236,7 @@ async def save(request: Request,
         "related": build_related_link(date),
         "sleep_hours": round(sleep_hours, 1),
         "pulse_avg_day": pulse_avg_day,
-        "pulse_avg_sleep": pulse_avg_sleep,
+        "pulse_avg_sleep": final_pulse_avg_sleep,
         "steps_total": steps_total,
         "sleep_awakenings": existing["sleep_awakenings"],
         "well_being": well_being,
@@ -330,6 +330,10 @@ async def sync_endpoint(request: Request,
 
     # steps: ALWAYS update (accumulate throughout the day)
     final_steps_total = steps_total
+
+    # Sleep pulse: do not erase a previously recorded value when a later sync
+    # has no usable night HR samples. A non-zero new measurement may update it.
+    final_pulse_avg_sleep = pulse_avg_sleep if pulse_avg_sleep > 0 else existing.get("pulse_avg_sleep", 0)
 
     # well_being: preserve the existing value exactly. For a brand-new note,
     # parse_note() supplies the creation default of 9.
