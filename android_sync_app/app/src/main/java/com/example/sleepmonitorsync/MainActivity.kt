@@ -1,9 +1,9 @@
+import com.example.sleepmonitorsync.VersionedLog
 package com.example.sleepmonitorsync
 
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.i(LOG_TAG, "=== $APP_BUILD_TAG ===")
+        VersionedLog.i(LOG_TAG, "=== $APP_BUILD_TAG ===")
 
         val prefs = getSharedPreferences("prefs", MODE_PRIVATE)
 
