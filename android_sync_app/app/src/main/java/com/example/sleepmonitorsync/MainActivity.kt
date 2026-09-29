@@ -43,8 +43,8 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v52 (29.09.2026) - привязка HCI и sleep past-fetch"
-        const val LOG_TAG = "SleepMonitor-v52"
+        const val APP_BUILD_TAG = "v53 (29.09.2026) - исправление compile error ByteString"
+        const val LOG_TAG = "SleepMonitor-v53"
     }
 
     private val permissions = setOf(
