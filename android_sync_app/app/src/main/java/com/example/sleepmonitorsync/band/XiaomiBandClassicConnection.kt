@@ -181,6 +181,8 @@ class XiaomiBandClassicConnection(
     private var currentChunkTotal = 0
     private var fetchIdleDeferred: CompletableDeferred<Unit>? = null
     private var pastFetchRequested = false
+    private var todayFilesExpected = 0
+    private var todayFilesCompleted = 0
 
     // ============================== Auth ==============================
 
@@ -538,6 +540,8 @@ class XiaomiBandClassicConnection(
         currentChunkBuffer = ByteArray(0)
         currentChunkTotal = 0
         pastFetchRequested = false
+        todayFilesExpected = 0
+        todayFilesCompleted = 0
 
         return try {
             withTimeout(FETCH_OVERALL_TIMEOUT_MS) {
@@ -600,9 +604,14 @@ class XiaomiBandClassicConnection(
                     return
                 }
 
+                val offeredCount = ids.size() / 7
+                if (command.subtype == HEALTH_SUBTYPE_FILES_OFFERED) {
+                    todayFilesExpected = offeredCount
+                    todayFilesCompleted = 0
+                }
                 Log.i(
                     TAG,
-                    "Band offered ${ids.size() / 7} file(s) in health subtype=${command.subtype}, requesting them"
+                    "Band offered $offeredCount file(s) in health subtype=${command.subtype}, requesting them"
                 )
                 val requestCmd = XiaomiProto.Command.newBuilder()
                     .setType(CMD_TYPE_HEALTH)
@@ -613,14 +622,10 @@ class XiaomiBandClassicConnection(
                     .build()
                 sendEncryptedProtobufCommand(sock, requestCmd)
 
-                // Gadgetbridge returns from its response handler before the past request
-                // when the today file-id list is invalid. Match that sequencing exactly.
-                // For a valid today offer, subtype=2 is a bare Command{type=8, subtype=2};
-                // the response uses subtype=2 again and carries file IDs in Health.
-                if (command.subtype == HEALTH_SUBTYPE_FILES_OFFERED && !pastFetchRequested) {
-                    pastFetchRequested = true
-                    sendHealthFetchPast(sock)
-                }
+                // Do not request "past" while the band is still streaming today's
+                // files. The v55 trace showed an empty subtype=2 response when we sent it
+                // immediately after the offer. We request past only after every today file
+                // stream has completed.
             }
             else -> Log.d(TAG, "Ignoring health subtype=${command.subtype}")
         }
@@ -655,6 +660,19 @@ class XiaomiBandClassicConnection(
 
         val data = currentChunkBuffer
         currentChunkBuffer = ByteArray(0)
+
+        if (!pastFetchRequested && todayFilesExpected > 0) {
+            todayFilesCompleted++
+            Log.i(
+                TAG,
+                "Today file stream completed: $todayFilesCompleted/$todayFilesExpected"
+            )
+            if (todayFilesCompleted >= todayFilesExpected) {
+                pastFetchRequested = true
+                Log.i(TAG, "✓ All today file streams completed; requesting past activity files now")
+                sendHealthFetchPast(sock)
+            }
+        }
 
         if (data.size < 13) {
             Log.w(TAG, "Activity file too short (${data.size} bytes), skipping")
