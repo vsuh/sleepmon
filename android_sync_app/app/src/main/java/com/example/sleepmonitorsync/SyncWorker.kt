@@ -10,7 +10,7 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
     CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
-        Log.i("SyncWorker", "Starting Xiaomi band background sync")
+        Log.i(TAG, "Starting Xiaomi band background sync (${AppVersion.label})")
 
         val prefs = applicationContext.getSharedPreferences("prefs", Context.MODE_PRIVATE)
         val primaryUrl = prefs.getString("serverUrl", "") ?: ""
@@ -18,14 +18,14 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
         val pin = prefs.getString("appPin", "") ?: ""
 
         if (primaryUrl.isEmpty() || pin.isEmpty()) {
-            Log.w("SyncWorker", "Server URL or PIN is empty. Aborting.")
+            Log.w(TAG, "Server URL or PIN is empty. Aborting.")
             return Result.failure()
         }
 
         val credentials = BandCredentials.load(applicationContext)
         val authKey = credentials.authKeyHex.trim().removePrefix("0x").removePrefix("0X")
         if (authKey.length != 32 || authKey.any { it.digitToIntOrNull(16) == null }) {
-            Log.w("SyncWorker", "Xiaomi auth key is not configured. Waiting for user to enter it in Settings.")
+            Log.w(TAG, "Xiaomi auth key is not configured. Waiting for user to enter it in Settings.")
             return Result.failure()
         }
 
@@ -35,7 +35,7 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
             backupUrl,
             pin
         ) { status ->
-            Log.i("SyncWorker", status)
+            Log.i(TAG, status)
         }
 
         return if (success) {
@@ -44,5 +44,9 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
             // WorkManager will retry transient Bluetooth/network/server failures.
             Result.retry()
         }
+    }
+
+    companion object {
+        private val TAG = AppVersion.logTag("SyncWorker")
     }
 }
