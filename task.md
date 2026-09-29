@@ -593,3 +593,27 @@ APK локально не собирался; после изменения тр
 - очередь должна быть приоритетной, как у Gadgetbridge, а не FIFO;
 - после завершения каждого file stream выбирается следующий ID из очереди;
 - IDs, полученные от past-response, добавляются в ту же очередь.
+
+## 34. Android — sequential one-file fetch ported from Gadgetbridge
+
+В v58 схема получения activity-файлов доведена до фактической реализации Gadgetbridge.
+
+Подтверждено upstream:
+- `XiaomiHealthService.handleActivityFetchResponse()` передаёт все file IDs в `XiaomiActivityFileFetcher`;
+- fetcher хранит их в `PriorityQueue`;
+- `triggerNextFetch()` отправляет только один `requestRecordedData(fileId)`;
+- после завершения/ошибки текущего file stream fetcher вызывает `triggerNextFetch()` для следующего ID;
+- при today-response past-запрос выполняется сразу после запуска первого file request. citeturn360269view0turn631872view0
+
+Перенесено в Android:
+- batch `subtype=3` с несколькими IDs удалён;
+- добавлена priority queue raw 7-byte file IDs;
+- одновременно разрешён только один активный file request;
+- after full file stream следующий ID берётся автоматически;
+- today-response запускает первый file request, затем сразу bare `subtype=2` past request;
+- IDs от today и past складываются в одну очередь;
+- duplicate file IDs отбрасываются.
+
+Это напрямую исправляет отличие v56/v57 от upstream, которое могло мешать корректному past/sleep обмену.
+
+APK не собирался в рабочем контейнере; требуется локальная `gradlew :app:assembleDebug`.
