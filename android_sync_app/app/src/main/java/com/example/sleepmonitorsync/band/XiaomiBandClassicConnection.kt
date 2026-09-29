@@ -1,6 +1,7 @@
 package com.example.sleepmonitorsync.band
 
 import com.example.sleepmonitorsync.AppVersion
+import com.example.sleepmonitorsync.VersionedLog
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
@@ -9,7 +10,6 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import com.example.sleepmonitorsync.band.activity.ActivitySample
 import com.example.sleepmonitorsync.band.activity.DailyDetailsParser
 import com.example.sleepmonitorsync.band.activity.DailySummary
@@ -223,7 +223,7 @@ class XiaomiBandClassicConnection(
         try {
             socket?.close()
         } catch (e: IOException) {
-            Log.w(TAG, "Error closing SPP socket (ignoring): ${e.message}")
+            VersionedLog.w(TAG, "Error closing SPP socket (ignoring): ${e.message}")
         }
         socket = null
     }
@@ -241,7 +241,7 @@ class XiaomiBandClassicConnection(
     }
 
     private fun failAndClose(message: String, cause: Throwable? = null) {
-        Log.e(TAG, "❌ $message", cause)
+        VersionedLog.e(TAG, "❌ $message", cause)
         if (!authOutcome.isCompleted) {
             authOutcome.complete(Result.failure(IllegalStateException(message, cause)))
         }
@@ -252,7 +252,7 @@ class XiaomiBandClassicConnection(
         if (hasBluetoothScanPermission()) {
             adapter.cancelDiscovery()
         } else {
-            Log.w(TAG, "BLUETOOTH_SCAN not granted, skipping cancelDiscovery() (non-fatal)")
+            VersionedLog.w(TAG, "BLUETOOTH_SCAN not granted, skipping cancelDiscovery() (non-fatal)")
         }
 
         val device: BluetoothDevice = try {
@@ -263,12 +263,12 @@ class XiaomiBandClassicConnection(
         }
 
         var sock: BluetoothSocket? = null
-        Log.i(TAG, "=== " + AppVersion.buildTag("XiaomiBand sleep past-fetch; diagnostics") + " ===")
+        VersionedLog.i(TAG, "=== " + AppVersion.buildTag("XiaomiBand sleep past-fetch; diagnostics") + " ===")
         for (round in 1..MAX_CONNECT_ROUNDS) {
             sock = openSocket(device, insecure = false)
             if (sock != null) break
             if (round < MAX_CONNECT_ROUNDS) {
-                Log.w(TAG, "[round $round] Secure RFCOMM connect failed, backing off ${CONNECT_ROUND_BACKOFF_MS}ms before retrying")
+                VersionedLog.w(TAG, "[round $round] Secure RFCOMM connect failed, backing off ${CONNECT_ROUND_BACKOFF_MS}ms before retrying")
                 Thread.sleep(CONNECT_ROUND_BACKOFF_MS)
             }
         }
@@ -278,7 +278,7 @@ class XiaomiBandClassicConnection(
         }
 
         socket = sock
-        Log.i(TAG, "✅ SPP socket connected")
+        VersionedLog.i(TAG, "✅ SPP socket connected")
         Thread.sleep(POST_CONNECT_SETTLE_MS)
 
         startReaderThread(sock)
@@ -292,15 +292,15 @@ class XiaomiBandClassicConnection(
             if (insecure) device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
             else device.createRfcommSocketToServiceRecord(SPP_UUID)
         } catch (e: IOException) {
-            Log.w(TAG, "Failed to create ${if (insecure) "insecure" else "secure"} RFCOMM socket: ${e.message}")
+            VersionedLog.w(TAG, "Failed to create ${if (insecure) "insecure" else "secure"} RFCOMM socket: ${e.message}")
             return null
         }
         return try {
-            Log.i(TAG, "Connecting ${if (insecure) "insecure" else "secure"} SPP socket to ${device.address}...")
+            VersionedLog.i(TAG, "Connecting ${if (insecure) "insecure" else "secure"} SPP socket to ${device.address}...")
             sock.connect()
             sock
         } catch (e: IOException) {
-            Log.w(TAG, "${if (insecure) "Insecure" else "Secure"} SPP connect() failed: ${e.message}")
+            VersionedLog.w(TAG, "${if (insecure) "Insecure" else "Secure"} SPP connect() failed: ${e.message}")
             try { sock.close() } catch (_: IOException) {}
             null
         }
@@ -337,7 +337,7 @@ class XiaomiBandClassicConnection(
             Thread.sleep(SESSION_CONFIG_TIMEOUT_MS)
             if (!sessionConfigHandled) {
                 sessionConfigHandled = true
-                Log.w(TAG, "No session-config response within ${SESSION_CONFIG_TIMEOUT_MS}ms, proceeding with auth anyway")
+                VersionedLog.w(TAG, "No session-config response within ${SESSION_CONFIG_TIMEOUT_MS}ms, proceeding with auth anyway")
                 sendPhoneNonce(sock)
             }
         }, "XiaomiSppSessionTimeout").apply {
@@ -360,7 +360,7 @@ class XiaomiBandClassicConnection(
             XiaomiSppFrameV2.PACKET_TYPE_SESSION_CONFIG -> {
                 if (!sessionConfigHandled) {
                     sessionConfigHandled = true
-                    Log.i(TAG, "Session config response: ${frame.payload.joinToString(" ") { "%02x".format(it) }}")
+                    VersionedLog.i(TAG, "Session config response: ${frame.payload.joinToString(" ") { "%02x".format(it) }}")
                     sendPhoneNonce(sock)
                 }
             }
@@ -370,9 +370,9 @@ class XiaomiBandClassicConnection(
                 handleDataPayload(sock, frame.payload)
             }
             XiaomiSppFrameV2.PACKET_TYPE_ACK -> {
-                Log.d(TAG, "Got ack for seq=${frame.sequenceNumber}")
+                VersionedLog.d(TAG, "Got ack for seq=${frame.sequenceNumber}")
             }
-            else -> Log.d(TAG, "Ignoring unknown packet type=${frame.packetType}")
+            else -> VersionedLog.d(TAG, "Ignoring unknown packet type=${frame.packetType}")
         }
     }
 
@@ -387,7 +387,7 @@ class XiaomiBandClassicConnection(
                 val protobufBytes = if (opCode == XiaomiSppFrameV2.OPCODE_SEND_ENCRYPTED) {
                     val key = authMaterial?.decryptionKey
                     if (key == null) {
-                        Log.w(TAG, "Got encrypted protobuf before auth material was ready - ignoring")
+                        VersionedLog.w(TAG, "Got encrypted protobuf before auth material was ready - ignoring")
                         return
                     }
                     XiaomiCrypto.ctrCryptV2(key, inner)
@@ -402,7 +402,7 @@ class XiaomiBandClassicConnection(
                 } else inner
                 handleActivityChunk(sock, plain)
             }
-            else -> Log.d(TAG, "Ignoring DATA on channel $rawChannel")
+            else -> VersionedLog.d(TAG, "Ignoring DATA on channel $rawChannel")
         }
     }
 
@@ -411,7 +411,7 @@ class XiaomiBandClassicConnection(
         val command = try {
             XiaomiProto.Command.parseFrom(payload)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to parse Command protobuf from watch: ${e.message}")
+            VersionedLog.w(TAG, "Failed to parse Command protobuf from watch: ${e.message}")
             return
         }
 
@@ -419,10 +419,10 @@ class XiaomiBandClassicConnection(
             CMD_TYPE_AUTH -> when (command.subtype) {
                 CMD_SUBTYPE_NONCE -> handleWatchNonce(sock, command)
                 CMD_SUBTYPE_AUTH -> handleAuthResult()
-                else -> Log.d(TAG, "Ignoring auth subtype=${command.subtype}")
+                else -> VersionedLog.d(TAG, "Ignoring auth subtype=${command.subtype}")
             }
             CMD_TYPE_HEALTH -> if (fetchActive) handleHealthCommand(sock, command)
-            else -> Log.d(TAG, "Ignoring command type=${command.type} subtype=${command.subtype}${if (fetchActive) " (waiting for file offer)" else ""}")
+            else -> VersionedLog.d(TAG, "Ignoring command type=${command.type} subtype=${command.subtype}${if (fetchActive) " (waiting for file offer)" else ""}")
         }
     }
 
@@ -446,12 +446,12 @@ class XiaomiBandClassicConnection(
             return
         }
         authMaterial = material
-        Log.i(TAG, "✅ Watch nonce verified, sending device info (step 3)")
+        VersionedLog.i(TAG, "✅ Watch nonce verified, sending device info (step 3)")
         sendAuthStep3(sock, material)
     }
 
     private fun handleAuthResult() {
-        Log.i(TAG, "✅ Auth handshake complete")
+        VersionedLog.i(TAG, "✅ Auth handshake complete")
         if (!authOutcome.isCompleted) {
             authOutcome.complete(Result.success(Unit))
         }
@@ -594,13 +594,13 @@ class XiaomiBandClassicConnection(
             HEALTH_SUBTYPE_FILES_OFFERED,
             HEALTH_SUBTYPE_FETCH_PAST -> {
                 val ids = command.health.activityRequestFileIds
-                Log.i(
+                VersionedLog.i(
                     TAG,
                     "Health offer: subtype=${command.subtype}, fileIdsBytes=${ids.size()}, " +
                         "fileCount=${ids.size() / 7}"
                 )
                 if (ids.size() % 7 != 0 || ids.isEmpty()) {
-                    Log.d(
+                    VersionedLog.d(
                         TAG,
                         "Health message subtype=${command.subtype} with no/invalid fileIds (${ids.size()} bytes) - ignoring"
                     )
@@ -617,7 +617,7 @@ class XiaomiBandClassicConnection(
                     }
                     offset += 7
                 }
-                Log.i(
+                VersionedLog.i(
                     TAG,
                     "Band offered $offeredCount file(s) in health subtype=${command.subtype}, " +
                         "queueSize=${pendingFileRequests.size}"
@@ -628,11 +628,11 @@ class XiaomiBandClassicConnection(
                 requestNextActivityFile(sock)
                 if (command.subtype == HEALTH_SUBTYPE_FILES_OFFERED && !pastFetchRequested) {
                     pastFetchRequested = true
-                    Log.i(TAG, "↻ Today offer handled after first file request; requesting past activity files now")
+                    VersionedLog.i(TAG, "↻ Today offer handled after first file request; requesting past activity files now")
                     sendHealthFetchPast(sock)
                 }
             }
-            else -> Log.d(TAG, "Ignoring health subtype=${command.subtype}")
+            else -> VersionedLog.d(TAG, "Ignoring health subtype=${command.subtype}")
         }
     }
 
@@ -666,13 +666,13 @@ class XiaomiBandClassicConnection(
 
         if (sendEncryptedProtobufCommand(sock, requestCmd)) {
             fileRequestInFlight = true
-            Log.i(
+            VersionedLog.i(
                 TAG,
                 "→ Requested activity file rawFileId=${rawId.joinToString("") { "%02x".format(it) }}, " +
                     "remainingQueue=${pendingFileRequests.size}"
             )
         } else {
-            Log.w(
+            VersionedLog.w(
                 TAG,
                 "⚠️ Failed to request activity file rawFileId=${rawId.joinToString("") { "%02x".format(it) }}"
             )
@@ -687,9 +687,9 @@ class XiaomiBandClassicConnection(
             .build()
 
         if (sendEncryptedProtobufCommand(sock, command)) {
-            Log.i(TAG, "↻ Requested past activity files (health subtype=2, protobufBytes=4)")
+            VersionedLog.i(TAG, "↻ Requested past activity files (health subtype=2, protobufBytes=4)")
         } else {
-            Log.w(TAG, "⚠️ Failed to request past activity files (health subtype=2)")
+            VersionedLog.w(TAG, "⚠️ Failed to request past activity files (health subtype=2)")
         }
     }
 
@@ -713,7 +713,7 @@ class XiaomiBandClassicConnection(
 
         try {
             if (data.size < 13) {
-                Log.w(TAG, "Activity file too short (${data.size} bytes), skipping")
+                VersionedLog.w(TAG, "Activity file too short (${data.size} bytes), skipping")
                 filesFailed++
                 return
             }
@@ -726,13 +726,13 @@ class XiaomiBandClassicConnection(
                 ((data[data.size - 1].toInt() and 0xFF) shl 24)
 
             if (crc32 != expectedCrc32) {
-                Log.w(TAG, "Activity file CRC32 mismatch (got ${"%08x".format(crc32)}, expected ${"%08x".format(expectedCrc32)})")
+                VersionedLog.w(TAG, "Activity file CRC32 mismatch (got ${"%08x".format(crc32)}, expected ${"%08x".format(expectedCrc32)})")
                 filesFailed++
                 return
             }
 
             val fileId = XiaomiActivityFileId.from(data.copyOfRange(0, 7))
-            Log.i(
+            VersionedLog.i(
                 TAG,
                 "Received file $fileId (${data.size} bytes), rawFileId=${data.copyOfRange(0, 7).joinToString("") { "%02x".format(it) }}"
             )
@@ -762,7 +762,7 @@ class XiaomiBandClassicConnection(
                         val sleep = SleepDetailsParser.parse(fileId, data)
                         if (sleep != null) {
                             sleepSummaries.add(sleep)
-                            Log.i(
+                            VersionedLog.i(
                                 TAG,
                                 "Parsed Xiaomi sleep: fileId=${fileId.raw.joinToString("") { "%02x".format(it) }}, " +
                                     "bed=${sleep.bedTimeSeconds}, wake=${sleep.wakeupTimeSeconds}, " +
@@ -770,7 +770,7 @@ class XiaomiBandClassicConnection(
                             )
                             true
                         } else {
-                            Log.w(TAG, "❌ Xiaomi sleep parser returned null for v${fileId.version} (${data.size} bytes)")
+                            VersionedLog.w(TAG, "❌ Xiaomi sleep parser returned null for v${fileId.version} (${data.size} bytes)")
                             false
                         }
                     }
@@ -825,26 +825,26 @@ class XiaomiBandClassicConnection(
         }
         socket = null
 
-        Log.i(TAG, "↻ SPP download session closed; reconnecting to acknowledge ${ids.size} file(s)")
+        VersionedLog.i(TAG, "↻ SPP download session closed; reconnecting to acknowledge ${ids.size} file(s)")
         val reconnect = XiaomiBandClassicConnection(context, credentials)
         return try {
             val auth = reconnect.authenticate()
             if (auth.isFailure) {
-                Log.e(TAG, "❌ Reconnect for deferred ACK failed: ${auth.exceptionOrNull()?.message}", auth.exceptionOrNull())
+                VersionedLog.e(TAG, "❌ Reconnect for deferred ACK failed: ${auth.exceptionOrNull()?.message}", auth.exceptionOrNull())
                 false
             } else {
                 val newSock = reconnect.socket
                 if (newSock == null || !reconnect.sendFileAcks(newSock, ids)) {
-                    Log.e(TAG, "❌ Failed to send deferred ACKs on fresh SPP session")
+                    VersionedLog.e(TAG, "❌ Failed to send deferred ACKs on fresh SPP session")
                     false
                 } else {
                     pendingFileAcks.removeAll { pending -> ids.any { it.contentEquals(pending) } }
-                    Log.i(TAG, "✅ Acknowledged ${ids.size} activity file(s) on fresh SPP session")
+                    VersionedLog.i(TAG, "✅ Acknowledged ${ids.size} activity file(s) on fresh SPP session")
                     true
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to reconnect for deferred ACK: ${e.message}", e)
+            VersionedLog.e(TAG, "❌ Failed to reconnect for deferred ACK: ${e.message}", e)
             false
         } finally {
             reconnect.disconnect()
@@ -866,13 +866,13 @@ class XiaomiBandClassicConnection(
                     )
                     .build()
                 if (!sendEncryptedProtobufCommand(sock, ackCmd)) {
-                    Log.e(TAG, "❌ Failed to send ACK for activity file")
+                    VersionedLog.e(TAG, "❌ Failed to send ACK for activity file")
                     return false
                 }
             }
             true
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to acknowledge activity files: ${e.message}", e)
+            VersionedLog.e(TAG, "❌ Failed to acknowledge activity files: ${e.message}", e)
             false
         }
     }
@@ -910,7 +910,7 @@ class XiaomiBandClassicConnection(
             out.flush()
             true
         } catch (e: IOException) {
-            Log.e(TAG, "SPP write failed: ${e.message}", e)
+            VersionedLog.e(TAG, "SPP write failed: ${e.message}", e)
             false
         }
     }
