@@ -21,7 +21,7 @@
 
 ## 2. Текущий статус
 
-**Рабочая версия Android: v61 (29.09.2026).**
+**Рабочая версия Android: v62 (29.09.2026).**
 
 Подтверждено реальным E2E-тестом:
 
@@ -645,3 +645,12 @@ SyncWorker SyncHelper XiaomiBandClassic SleepMonitor
 Добавлен `VersionedLog`: он сохраняет стабильные TAG и добавляет `[v61 (29.09.2026)]` в каждое сообщение. Это позволяет одновременно фильтровать поток по компоненту и однозначно определять сборку по содержимому строки.
 
 Затронуты `XiaomiBandClassicConnection`, `SyncHelper`, `SyncWorker`, `MainActivity`, `AppVersion` и новый `VersionedLog.kt`; APK в контейнере не собирался.
+
+
+## v62 (29.09.2026) — исправление compile error после v61
+
+Сборка v61 не компилировалась: в `MainActivity.kt`, `SyncHelper.kt` и `SyncWorker.kt` импорт `VersionedLog` оказался перед строкой `package`, из-за чего Kotlin сообщал `imports are only allowed in the beginning of file` и затем выдавал каскад вторичных ошибок.
+
+В v62 порядок исправлен: `package` снова стоит первой декларацией, затем идут импорты. Логика Bluetooth/SPP и формат стабильных Logcat TAG при этом не менялись.
+
+Номер `AppVersion.NUMBER` повышен с v61 до **v62** по правилу проекта. APK в контейнере не собирался.
