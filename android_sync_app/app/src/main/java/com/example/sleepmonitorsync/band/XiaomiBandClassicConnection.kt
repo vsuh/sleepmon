@@ -27,6 +27,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 import java.io.OutputStream
+import java.util.ArrayDeque
 import java.security.SecureRandom
 import java.util.Locale
 import java.util.UUID
@@ -181,8 +182,8 @@ class XiaomiBandClassicConnection(
     private var currentChunkTotal = 0
     private var fetchIdleDeferred: CompletableDeferred<Unit>? = null
     private var pastFetchRequested = false
-    private var todayFilesExpected = 0
-    private var todayFilesCompleted = 0
+    private val pendingFileRequests = ArrayDeque<ByteArray>()
+    private var fileRequestInFlight = false
 
     // ============================== Auth ==============================
 
@@ -540,8 +541,8 @@ class XiaomiBandClassicConnection(
         currentChunkBuffer = ByteArray(0)
         currentChunkTotal = 0
         pastFetchRequested = false
-        todayFilesExpected = 0
-        todayFilesCompleted = 0
+        pendingFileRequests.clear()
+        fileRequestInFlight = false
 
         return try {
             withTimeout(FETCH_OVERALL_TIMEOUT_MS) {
@@ -604,30 +605,58 @@ class XiaomiBandClassicConnection(
                     return
                 }
 
-                val offeredCount = ids.size() / 7
-                if (command.subtype == HEALTH_SUBTYPE_FILES_OFFERED) {
-                    todayFilesExpected = offeredCount
-                    todayFilesCompleted = 0
+                val rawIds = ids.toByteArray()
+                val offeredCount = rawIds.size / 7
+                var offset = 0
+                while (offset < rawIds.size) {
+                    val rawId = rawIds.copyOfRange(offset, offset + 7)
+                    if (pendingFileRequests.none { it.contentEquals(rawId) }) {
+                        pendingFileRequests.addLast(rawId)
+                    }
+                    offset += 7
                 }
                 Log.i(
                     TAG,
-                    "Band offered $offeredCount file(s) in health subtype=${command.subtype}, requesting them"
+                    "Band offered $offeredCount file(s) in health subtype=${command.subtype}, " +
+                        "queueSize=${pendingFileRequests.size}"
                 )
-                val requestCmd = XiaomiProto.Command.newBuilder()
-                    .setType(CMD_TYPE_HEALTH)
-                    .setSubtype(HEALTH_SUBTYPE_REQUEST_FILES)
-                    .setHealth(
-                        XiaomiProto.Health.newBuilder().setActivityRequestFileIds(ids)
-                    )
-                    .build()
-                sendEncryptedProtobufCommand(sock, requestCmd)
 
-                // Do not request "past" while the band is still streaming today's
-                // files. The v55 trace showed an empty subtype=2 response when we sent it
-                // immediately after the offer. We request past only after every today file
-                // stream has completed.
+                if (command.subtype == HEALTH_SUBTYPE_FILES_OFFERED && !pastFetchRequested) {
+                    pastFetchRequested = true
+                    Log.i(TAG, "↻ Today offer handled; requesting past activity files now")
+                    sendHealthFetchPast(sock)
+                }
+
+                requestNextActivityFile(sock)
             }
             else -> Log.d(TAG, "Ignoring health subtype=${command.subtype}")
+        }
+    }
+
+    private fun requestNextActivityFile(sock: BluetoothSocket) {
+        if (!fetchActive || fileRequestInFlight || pendingFileRequests.isEmpty()) return
+
+        val rawId = pendingFileRequests.removeFirst()
+        val requestCmd = XiaomiProto.Command.newBuilder()
+            .setType(CMD_TYPE_HEALTH)
+            .setSubtype(HEALTH_SUBTYPE_REQUEST_FILES)
+            .setHealth(
+                XiaomiProto.Health.newBuilder().setActivityRequestFileIds(
+                    com.google.protobuf.ByteString.copyFrom(rawId)
+                )
+            )
+            .build()
+
+        if (sendEncryptedProtobufCommand(sock, requestCmd)) {
+            fileRequestInFlight = true
+            Log.i(
+                TAG,
+                "→ Requested activity file rawFileId=${rawId.joinToString(\"\") { \"%02x\".format(it) }}, " +
+                    "remainingQueue=${pendingFileRequests.size}"
+            )
+        } else {
+            Log.w(TAG, "⚠️ Failed to request activity file rawFileId=${rawId.joinToString(\"\") { \"%02x\".format(it) }}")
+            pendingFileRequests.addFirst(rawId)
         }
     }
 
@@ -660,25 +689,14 @@ class XiaomiBandClassicConnection(
 
         val data = currentChunkBuffer
         currentChunkBuffer = ByteArray(0)
+        fileRequestInFlight = false
 
-        if (!pastFetchRequested && todayFilesExpected > 0) {
-            todayFilesCompleted++
-            Log.i(
-                TAG,
-                "Today file stream completed: $todayFilesCompleted/$todayFilesExpected"
-            )
-            if (todayFilesCompleted >= todayFilesExpected) {
-                pastFetchRequested = true
-                Log.i(TAG, "✓ All today file streams completed; requesting past activity files now")
-                sendHealthFetchPast(sock)
+        try {
+            if (data.size < 13) {
+                Log.w(TAG, "Activity file too short (${data.size} bytes), skipping")
+                filesFailed++
+                return
             }
-        }
-
-        if (data.size < 13) {
-            Log.w(TAG, "Activity file too short (${data.size} bytes), skipping")
-            filesFailed++
-            return
-        }
 
         val bodyForCrc = data.copyOfRange(0, data.size - 4)
         val crc32 = CRC32().apply { update(bodyForCrc) }.value.toInt()
@@ -754,8 +772,11 @@ class XiaomiBandClassicConnection(
         // decoded data successfully. If the backend is unavailable, closing the socket
         // without an ACK makes the band offer the file again on the next sync instead of
         // losing it after a successful Bluetooth transfer.
-        if (parsedOkForAck(fileId, isKnownCombo)) {
-            pendingFileAcks.add(fileId.raw)
+            if (parsedOkForAck(fileId, isKnownCombo)) {
+                pendingFileAcks.add(fileId.raw)
+            }
+        } finally {
+            requestNextActivityFile(sock)
         }
     }
 
