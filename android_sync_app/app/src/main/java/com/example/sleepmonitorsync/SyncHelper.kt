@@ -41,7 +41,7 @@ object SyncHelper {
         onStatus: (String) -> Unit
     ): Boolean {
         return XiaomiBandClassicConnection.withExclusiveSppOperation {
-            Log.i(TAG, "=== v52 (29.09.2026) - HCI-bound sleep past-fetch ===")
+            Log.i(TAG, "=== v53 (29.09.2026) - HCI-bound sleep past-fetch; ByteString compile fix ===")
             Log.i(TAG, "Xiaomi SPP operation lock acquired")
             val credentials = BandCredentials.load(context)
         val authKey = credentials.authKeyHex.trim().removePrefix("0x").removePrefix("0X")
