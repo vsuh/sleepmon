@@ -497,6 +497,11 @@ Function invocation 'size()' expected.
 
 ## 29. Android v54 — единая версия и расширенная диагностика sleep-fetch
 
+Изменено также \`MainActivity\`:
+- build label и Logcat tag больше не содержат собственного номера версии;
+- используются \`AppVersion\` как единый источник версии.
+
+
 После локального запуска выяснилось, что runtime Logcat всё ещё показывал `XiaomiBandClassic: === v51 ...`: в `XiaomiBandClassicConnection` оставался отдельный hardcoded build tag. Это позволяло одному APK выдавать разные номера версии в разных классах.
 
 В v54 добавлен `AppVersion.kt` как единый источник номера версии:
