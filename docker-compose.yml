@@ -37,5 +37,5 @@ services:
       - TZ=Europe/Moscow
     volumes:
       - /mnt/hdd/syncthing/AI.obsdn:/vault:rw
-      - /mnt/hdd/syncthing/backups/sleepmon:/backups:rw
+      - ${SLEEPMON_BACKUP_DIR:-/mnt/hdd/syncthing/backups/sleepmon}:/backups:rw
     restart: unless-stopped
