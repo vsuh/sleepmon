@@ -263,7 +263,7 @@ class XiaomiBandClassicConnection(
         }
 
         var sock: BluetoothSocket? = null
-        Log.i(TAG, "=== " + AppVersion.buildTag("XiaomiBand sequential file fetch") + " ===")
+        Log.i(TAG, "=== " + AppVersion.buildTag("XiaomiBand sleep past-fetch; diagnostics") + " ===")
         for (round in 1..MAX_CONNECT_ROUNDS) {
             sock = openSocket(device, insecure = false)
             if (sock != null) break
@@ -623,9 +623,8 @@ class XiaomiBandClassicConnection(
                         "queueSize=${pendingFileRequests.size}"
                 )
 
-                // Gadgetbridge starts fetching the first queued today file, and then
-                // immediately asks for past data. Both today/past responses feed the same
-                // one-file-at-a-time queue.
+                // Gadgetbridge starts the first file request before sending the past
+                // request. Today and past IDs share one sequential queue.
                 requestNextActivityFile(sock)
                 if (command.subtype == HEALTH_SUBTYPE_FILES_OFFERED && !pastFetchRequested) {
                     pastFetchRequested = true
@@ -670,7 +669,7 @@ class XiaomiBandClassicConnection(
             Log.i(
                 TAG,
                 "→ Requested activity file rawFileId=${rawId.joinToString("") { "%02x".format(it) }}, " +
-                      "remainingQueue=${pendingFileRequests.size}"
+                    "remainingQueue=${pendingFileRequests.size}"
             )
         } else {
             Log.w(
@@ -706,7 +705,7 @@ class XiaomiBandClassicConnection(
         }
         currentChunkBuffer += chunkPayload
 
-        if (num != currentChunkTotal) return // wait for more chunks
+        if (num != currentChunkTotal) return
 
         val data = currentChunkBuffer
         currentChunkBuffer = ByteArray(0)
@@ -719,13 +718,8 @@ class XiaomiBandClassicConnection(
                 return
             }
 
-                val bodyForCrc = data.copyOfRange(0, data.size - 4)
-                Log.w(TAG, "Activity file too short (${data.size} bytes), skipping")
-                filesFailed++
-                return
-            }
-
-                val crc32 = CRC32().apply { update(bodyForCrc) }.value.toInt()
+            val bodyForCrc = data.copyOfRange(0, data.size - 4)
+            val crc32 = CRC32().apply { update(bodyForCrc) }.value.toInt()
             val expectedCrc32 = ((data[data.size - 4].toInt() and 0xFF)) or
                 ((data[data.size - 3].toInt() and 0xFF) shl 8) or
                 ((data[data.size - 2].toInt() and 0xFF) shl 16) or
@@ -785,23 +779,14 @@ class XiaomiBandClassicConnection(
                 if (parsedOk) {
                     filesReceived++
                 } else {
-                    // Known type/subtype/detail combo, but this specific file VERSION isn't
-                    // supported by our parser (e.g. DailySummaryParser only handles v5) -
-                    // that's a gap in our coverage, not a corrupted transfer, so it's
-                    // "unsupported" rather than a hard failure.
                     filesUnsupported++
                     unsupportedFileDescriptions.add("type=${fileId.type}/subtype=${fileId.subtype}/detail=${fileId.detailType}/v${fileId.version} (неизвестная версия, ${data.size}б)")
                 }
             }
 
-            // Do NOT acknowledge the file yet. The caller must first persist/upload the
-            // decoded data successfully. If the backend is unavailable, closing the socket
-            // without an ACK makes the band offer the file again on the next sync instead of
-            // losing it after a successful Bluetooth transfer.
-                if (parsedOkForAck(fileId, isKnownCombo)) {
-                    pendingFileAcks.add(fileId.raw)
-                }
-
+            if (parsedOkForAck(fileId, isKnownCombo)) {
+                pendingFileAcks.add(fileId.raw)
+            }
         } finally {
             requestNextActivityFile(sock)
         }
