@@ -533,3 +533,23 @@ Unresolved reference 'AppVersion'
 - номер централизованной версии повышен с v54 до **v55**;
 - логика централизованной версии, past-fetch и sleep diagnostics не изменялась;
 - следующий локальный build проверяет уже v55.
+
+## 31. E2E 29.09.2026 — фактически запущен старый APK v51
+
+В предоставленном Logcat после изменений v55 виден старый тег:
+
+```
+XiaomiBandClassic: === v51 (29.09.2026) - XiaomiBand sleep past-fetch ===
+```
+
+Это означает, что на устройстве в данном запуске работал не APK с текущего `master`, а ранее установленная сборка v51. Для v55 ожидаются теги `XiaomiBandClassic-v55`, `SyncHelper-v55`, `SyncWorker-v55`, `SleepMonitor-v55`.
+
+По самому Bluetooth-сеансу v51:
+- secure SPP подключение и auth handshake успешны;
+- today offer `subtype=1` содержит file IDs, файлы успешно запрашиваются;
+- после обработки today отправлен `health subtype=2` past-fetch;
+- браслет ответил `subtype=2`, но `activityRequestFileIds` были пустыми;
+- полученные и распарсенные файлы относятся к daily activity/summary; sleep `subtype=8` в этом сеансе не получен;
+- поэтому `sleep_hours=0`, `pulse_avg_sleep=0` являются ожидаемым результатом именно этого сеанса и не подтверждают ошибку parser'а.
+
+Для валидной проверки текущего v55 APK сначала необходимо локально собрать и установить именно свежий debug APK. Только после появления `*-v55` в Logcat следующий сеанс можно использовать для оценки текущего past-fetch кода.
