@@ -21,7 +21,7 @@
 
 ## 2. Текущий статус
 
-**Рабочая версия Android: v62 (29.09.2026).**
+**Рабочая версия Android: v63 (29.09.2026).**
 
 Подтверждено реальным E2E-тестом:
 
@@ -654,3 +654,13 @@ SyncWorker SyncHelper XiaomiBandClassic SleepMonitor
 В v62 порядок исправлен: `package` снова стоит первой декларацией, затем идут импорты. Логика Bluetooth/SPP и формат стабильных Logcat TAG при этом не менялись.
 
 Номер `AppVersion.NUMBER` повышен с v61 до **v62** по правилу проекта. APK в контейнере не собирался.
+
+## v63 (29.09.2026) — порядок activity files приведён к Gadgetbridge
+
+Анализ E2E v62 и upstream `XiaomiActivityFileFetcher`/`XiaomiActivityFileId` показал точное отличие в сортировке очереди. Gadgetbridge использует `XiaomiActivityFileId.compareTo()`, где после timestamp/timezone/type/subtype применяется специальный `detailType.getFetchOrder()`: SUMMARY → DETAILS → GPS_TRACK. В нашей очереди до v63 использовалась числовая сортировка `detailType`, то есть DETAILS (0) раньше SUMMARY (1).
+
+В v63 comparator исправлен на тот же порядок. Это устраняет подтверждённое расхождение с upstream и не меняет формат команд `subtype=2` или логику past-fetch.
+
+Источником порядка служит upstream Gadgetbridge: `XiaomiActivityFileId.compareTo()` и `XiaomiActivityFileFetcher.triggerNextFetch()`.
+
+Номер `AppVersion.NUMBER` повышен с v62 до **v63**. APK в контейнере не собирался.
