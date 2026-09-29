@@ -515,3 +515,20 @@ Function invocation 'size()' expected.
 - для неподдержанных activity-файлов должны сохраняться их type/subtype/detail/version, чтобы отличить отсутствие sleep-файла на браслете от непройденного parser path.
 
 Тест с данными пользователя 29.09.2026 пока не считается доказательством отказа past-fetch: Mi Fitness синхронизировал браслет около 09:10, а APK выполнил свою попытку только около 11:52. Если Mi Fitness уже подтвердил и удалил соответствующий activity-файл, повторно получить его с браслета нельзя. Следующий E2E-тест должен выполняться до синхронизации этого утра Mi Fitness либо на браслете с ещё не забранной ночной записью.
+
+## 30. Android v54 — compile fix для AppVersion
+
+Локальная сборка после v54 остановилась на:
+
+```
+Unresolved reference 'AppVersion'
+```
+
+в `XiaomiBandClassicConnection.kt`.
+
+Причина — `AppVersion` находится в пакете `com.example.sleepmonitorsync`, а класс Xiaomi находится в подпакете `com.example.sleepmonitorsync.band`; Kotlin не импортирует родительский пакет автоматически.
+
+Исправлено:
+- добавлен явный `import com.example.sleepmonitorsync.AppVersion` в `XiaomiBandClassicConnection.kt`;
+- логика централизованной версии и past-fetch не изменялась;
+- следующий локальный build должен снова проверить v54 после устранения compile-time ошибки.
