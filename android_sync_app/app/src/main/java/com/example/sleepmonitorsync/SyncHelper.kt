@@ -41,7 +41,7 @@ object SyncHelper {
         onStatus: (String) -> Unit
     ): Boolean {
         return XiaomiBandClassicConnection.withExclusiveSppOperation {
-            Log.i(TAG, "=== v53 (29.09.2026) - HCI-bound sleep past-fetch; ByteString compile fix ===")
+            Log.i(TAG, "=== " + AppVersion.buildTag("HCI-bound sleep past-fetch; diagnostics") + " ===")
             Log.i(TAG, "Xiaomi SPP operation lock acquired")
             val credentials = BandCredentials.load(context)
         val authKey = credentials.authKeyHex.trim().removePrefix("0x").removePrefix("0X")
@@ -73,10 +73,11 @@ object SyncHelper {
             }
 
             val result = fetch.getOrThrow()
-            onStatus(
-                "📊 Получено файлов: ${result.filesReceived}, минутных записей: ${result.perMinuteSamples.size}, " +
-                    "sleep-файлов: ${result.sleepSummaries.size}"
-            )
+            Log.i(TAG, "Xiaomi fetch result: received=${result.filesReceived}, failed=${result.filesFailed}, unsupported=${result.filesUnsupported}, sleep=${result.sleepSummaries.size}, minuteSamples=${result.perMinuteSamples.size}, dailySummaries=${result.dailySummaries.size}")
+            if (result.unsupportedFileDescriptions.isNotEmpty()) {
+                Log.w(TAG, "Unsupported activity files: ${result.unsupportedFileDescriptions.joinToString("; ")}")
+            }
+            onStatus("📊 Получено файлов: ${result.filesReceived}, минутных записей: ${result.perMinuteSamples.size}, daily-summary: ${result.dailySummaries.size}, sleep-файлов: ${result.sleepSummaries.size}, unsupported: ${result.filesUnsupported}")
 
             val days = aggregateBandSamples(result.perMinuteSamples, result.dailySummaries, result.sleepSummaries)
             if (days.isNotEmpty()) {
@@ -204,7 +205,7 @@ object SyncHelper {
             )
         }
     }
-    private const val TAG = "SyncHelper"
+    private val TAG = AppVersion.logTag("SyncHelper")
     private const val FALLBACK_TIMEOUT_SECONDS = 5L
 
     /**
