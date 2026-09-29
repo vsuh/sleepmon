@@ -21,7 +21,7 @@
 
 ## 2. Текущий статус
 
-**Рабочая версия Android: v56 (29.09.2026).**
+**Рабочая версия Android: v57 (29.09.2026).**
 
 Подтверждено реальным E2E-тестом:
 
@@ -577,3 +577,9 @@ XiaomiBandClassic: === v51 (29.09.2026) - XiaomiBand sleep past-fetch ===
 Это изменение основано непосредственно на реальном Logcat v55; следующий тест должен показать `All today file streams completed` **до** `Requested past activity files`.
 
 APK локально не собирался; после изменения требуется обычный `gradlew :app:assembleDebug`.
+
+## 32. Android v57 — централизованная версия перед переносом sequential activity fetch
+
+После анализа v56 по исходному Gadgetbridge подтверждено, что версия протокола в проекте была реализована не полностью: Gadgetbridge не отправляет все полученные file IDs одним `subtype=3`, а помещает их в очередь и запрашивает каждый файл отдельно; следующий `requestRecordedData(fileId)` отправляется после завершения предыдущего файла. При этом отдельный `subtype=2` past-запрос запускается сразу после обработки today-response. Это видно непосредственно в `XiaomiHealthService.handleActivityFetchResponse()` и `XiaomiActivityFileFetcher.triggerNextFetch()`. 
+
+В v57 централизованный номер версии повышен с v56 до v57 перед переносом этой схемы в Android. Логика получения файлов на этом шаге ещё не изменена; следующим commit будет заменён batch-request на последовательную очередь file IDs.
