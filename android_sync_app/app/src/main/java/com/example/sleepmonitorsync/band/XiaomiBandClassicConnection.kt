@@ -590,25 +590,26 @@ class XiaomiBandClassicConnection(
                         TAG,
                         "Health message subtype=${command.subtype} with no/invalid fileIds (${ids.size} bytes) - ignoring"
                     )
-                } else {
-                    Log.i(
-                        TAG,
-                        "Band offered ${ids.size() / 7} file(s) in health subtype=${command.subtype}, requesting them"
-                    )
-                    val requestCmd = XiaomiProto.Command.newBuilder()
-                        .setType(CMD_TYPE_HEALTH)
-                        .setSubtype(HEALTH_SUBTYPE_REQUEST_FILES)
-                        .setHealth(
-                            XiaomiProto.Health.newBuilder().setActivityRequestFileIds(ids)
-                        )
-                        .build()
-                    sendEncryptedProtobufCommand(sock, requestCmd)
+                    return
                 }
 
-                // Gadgetbridge's XiaomiHealthService performs the second "past" fetch
-                // immediately after handling the "today" response. Subtype=2 is a bare
-                // Command{type=8, subtype=2}; the response uses subtype=2 again and carries
-                // its file IDs in Health.activityRequestFileIds.
+                Log.i(
+                    TAG,
+                    "Band offered ${ids.size() / 7} file(s) in health subtype=${command.subtype}, requesting them"
+                )
+                val requestCmd = XiaomiProto.Command.newBuilder()
+                    .setType(CMD_TYPE_HEALTH)
+                    .setSubtype(HEALTH_SUBTYPE_REQUEST_FILES)
+                    .setHealth(
+                        XiaomiProto.Health.newBuilder().setActivityRequestFileIds(ids)
+                    )
+                    .build()
+                sendEncryptedProtobufCommand(sock, requestCmd)
+
+                // Gadgetbridge returns from its response handler before the past request
+                // when the today file-id list is invalid. Match that sequencing exactly.
+                // For a valid today offer, subtype=2 is a bare Command{type=8, subtype=2};
+                // the response uses subtype=2 again and carries file IDs in Health.
                 if (command.subtype == HEALTH_SUBTYPE_FILES_OFFERED && !pastFetchRequested) {
                     pastFetchRequested = true
                     sendHealthFetchPast(sock)
@@ -668,7 +669,10 @@ class XiaomiBandClassicConnection(
         }
 
         val fileId = XiaomiActivityFileId.from(data.copyOfRange(0, 7))
-        Log.i(TAG, "Received file $fileId (${data.size} bytes)")
+        Log.i(
+            TAG,
+            "Received file $fileId (${data.size} bytes), rawFileId=${data.copyOfRange(0, 7).joinToString("") { "%02x".format(it) }}"
+        )
 
         val isDailyCombo = fileId.type == XiaomiActivityFileId.TYPE_ACTIVITY &&
             fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_DAILY &&
@@ -695,7 +699,12 @@ class XiaomiBandClassicConnection(
                     val sleep = SleepDetailsParser.parse(fileId, data)
                     if (sleep != null) {
                         sleepSummaries.add(sleep)
-                        Log.i(TAG, "Parsed Xiaomi sleep: bed=${sleep.bedTimeSeconds}, wake=${sleep.wakeupTimeSeconds}, duration=${sleep.sleepDurationMinutes} min, awakenings=${sleep.wakeCount}")
+                        Log.i(
+                            TAG,
+                            "Parsed Xiaomi sleep: fileId=${fileId.raw.joinToString("") { "%02x".format(it) }}, " +
+                                "bed=${sleep.bedTimeSeconds}, wake=${sleep.wakeupTimeSeconds}, " +
+                                "duration=${sleep.sleepDurationMinutes} min, awakenings=${sleep.wakeCount}"
+                        )
                         true
                     } else {
                         Log.w(TAG, "❌ Xiaomi sleep parser returned null for v${fileId.version} (${data.size} bytes)")
