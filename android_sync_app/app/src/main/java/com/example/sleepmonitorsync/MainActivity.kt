@@ -43,8 +43,8 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        const val APP_BUILD_TAG = "v53 (29.09.2026) - исправление compile error ByteString"
-        const val LOG_TAG = "SleepMonitor-v53"
+        val APP_BUILD_TAG = AppVersion.buildTag("единая глобальная версия и sleep diagnostics")
+        val LOG_TAG = AppVersion.logTag("SleepMonitor")
     }
 
     private val permissions = setOf(
