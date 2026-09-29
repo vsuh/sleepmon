@@ -1,5 +1,7 @@
 package com.example.sleepmonitorsync.band
 
+import com.example.sleepmonitorsync.AppVersion
+
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
