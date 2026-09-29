@@ -1,6 +1,6 @@
+import com.example.sleepmonitorsync.VersionedLog
 package com.example.sleepmonitorsync
 
-import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
@@ -41,13 +41,13 @@ object SyncHelper {
         onStatus: (String) -> Unit
     ): Boolean {
         return XiaomiBandClassicConnection.withExclusiveSppOperation {
-            Log.i(TAG, "=== " + AppVersion.buildTag("HCI-bound sleep past-fetch; diagnostics") + " ===")
-            Log.i(TAG, "Xiaomi SPP operation lock acquired")
+            VersionedLog.i(TAG, "=== " + AppVersion.buildTag("HCI-bound sleep past-fetch; diagnostics") + " ===")
+            VersionedLog.i(TAG, "Xiaomi SPP operation lock acquired")
             val credentials = BandCredentials.load(context)
         val authKey = credentials.authKeyHex.trim().removePrefix("0x").removePrefix("0X")
         if (authKey.length != 32 || authKey.any { it.digitToIntOrNull(16) == null }) {
             val msg = "⚠️ Xiaomi auth key не задан. Откройте Настройки → Xiaomi Band и введите 32 hex-символа."
-            Log.w(TAG, msg)
+            VersionedLog.w(TAG, msg)
             onStatus(msg)
             return@withExclusiveSppOperation false
         }
@@ -58,7 +58,7 @@ object SyncHelper {
             val auth = connection.authenticate()
             if (auth.isFailure) {
                 val msg = "❌ Xiaomi auth: ${auth.exceptionOrNull()?.message}"
-                Log.e(TAG, msg, auth.exceptionOrNull())
+                VersionedLog.e(TAG, msg, auth.exceptionOrNull())
                 onStatus(msg)
                 return@withExclusiveSppOperation false
             }
@@ -67,15 +67,15 @@ object SyncHelper {
             val fetch = connection.fetchActivityData()
             if (fetch.isFailure) {
                 val msg = "❌ Xiaomi fetch: ${fetch.exceptionOrNull()?.message}"
-                Log.e(TAG, msg, fetch.exceptionOrNull())
+                VersionedLog.e(TAG, msg, fetch.exceptionOrNull())
                 onStatus(msg)
                 return@withExclusiveSppOperation false
             }
 
             val result = fetch.getOrThrow()
-            Log.i(TAG, "Xiaomi fetch result: received=${result.filesReceived}, failed=${result.filesFailed}, unsupported=${result.filesUnsupported}, sleep=${result.sleepSummaries.size}, minuteSamples=${result.perMinuteSamples.size}, dailySummaries=${result.dailySummaries.size}")
+            VersionedLog.i(TAG, "Xiaomi fetch result: received=${result.filesReceived}, failed=${result.filesFailed}, unsupported=${result.filesUnsupported}, sleep=${result.sleepSummaries.size}, minuteSamples=${result.perMinuteSamples.size}, dailySummaries=${result.dailySummaries.size}")
             if (result.unsupportedFileDescriptions.isNotEmpty()) {
-                Log.w(TAG, "Unsupported activity files: ${result.unsupportedFileDescriptions.joinToString("; ")}")
+                VersionedLog.w(TAG, "Unsupported activity files: ${result.unsupportedFileDescriptions.joinToString("; ")}")
             }
             onStatus("📊 Получено файлов: ${result.filesReceived}, минутных записей: ${result.perMinuteSamples.size}, daily-summary: ${result.dailySummaries.size}, sleep-файлов: ${result.sleepSummaries.size}, unsupported: ${result.filesUnsupported}")
 
@@ -120,12 +120,12 @@ object SyncHelper {
             onStatus("═══ Xiaomi sync завершён: ${pending.days.size} дн.; очередь очищена")
             return@withExclusiveSppOperation true
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Xiaomi sync failed: ${e.message}", e)
+            VersionedLog.e(TAG, "❌ Xiaomi sync failed: ${e.message}", e)
             onStatus("❌ Xiaomi sync: ${e.localizedMessage}")
             return@withExclusiveSppOperation false
         } finally {
             connection.disconnect()
-            Log.i(TAG, "═══ Xiaomi sync session finished")
+            VersionedLog.i(TAG, "═══ Xiaomi sync session finished")
             }
         }
     }
@@ -193,7 +193,7 @@ object SyncHelper {
                 0
             }
 
-            Log.i(TAG, "📊 $date: pulse_day=$pulse BPM, pulse_sleep=$sleepPulse BPM")
+            VersionedLog.i(TAG, "📊 $date: pulse_day=$pulse BPM, pulse_sleep=$sleepPulse BPM")
 
             BandDayAggregate(
                 date = date,
@@ -221,7 +221,7 @@ object SyncHelper {
         onStatus: (String) -> Unit
     ) {
         val today = LocalDate.now()
-        Log.i(TAG, "═══ Starting sync: last $days days (from ${today.minusDays(days.toLong())} to $today)")
+        VersionedLog.i(TAG, "═══ Starting sync: last $days days (from ${today.minusDays(days.toLong())} to $today)")
         performSyncRange(client, primaryUrl, backupUrl, pin, today.minusDays(days.toLong()), today, onStatus)
     }
 
@@ -243,15 +243,15 @@ object SyncHelper {
     ) {
         if (fromDate.isAfter(toDate)) {
             val msg = "❌ Error: 'from' date ($fromDate) is after 'to' date ($toDate)"
-            Log.e(TAG, msg)
+            VersionedLog.e(TAG, msg)
             onStatus(msg)
             return
         }
 
         try {
-            Log.i(TAG, "Resolving active server (primary: $primaryUrl, backup: $backupUrl)")
+            VersionedLog.i(TAG, "Resolving active server (primary: $primaryUrl, backup: $backupUrl)")
             val (activeUrl, cookie) = resolveActiveServer(primaryUrl, backupUrl, pin, onStatus)
-            Log.i(TAG, "✅ Connected to: $activeUrl")
+            VersionedLog.i(TAG, "✅ Connected to: $activeUrl")
 
             var current = fromDate
             var successCount = 0
@@ -261,14 +261,14 @@ object SyncHelper {
             while (!current.isAfter(toDate)) {
                 val dayNum = successCount + errorCount + 1
                 val progressMsg = "📅 Day $dayNum/$totalDays: syncing $current"
-                Log.i(TAG, progressMsg)
+                VersionedLog.i(TAG, progressMsg)
                 onStatus(progressMsg)
                 try {
                     syncSingleDay(client, activeUrl, cookie, current)
                     successCount++
-                    Log.i(TAG, "  ✅ $current synced successfully")
+                    VersionedLog.i(TAG, "  ✅ $current synced successfully")
                 } catch (e: Exception) {
-                    Log.e(TAG, "  ❌ Error syncing $current: ${e.message}", e)
+                    VersionedLog.e(TAG, "  ❌ Error syncing $current: ${e.message}", e)
                     errorCount++
                     onStatus("❌ Error on $current: ${e.localizedMessage}")
                 }
@@ -276,10 +276,10 @@ object SyncHelper {
             }
 
             val finishMsg = "═══ Sync finished: $successCount ok, $errorCount errors"
-            Log.i(TAG, finishMsg)
+            VersionedLog.i(TAG, finishMsg)
             onStatus(finishMsg)
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Fatal error during sync: ${e.message}", e)
+            VersionedLog.e(TAG, "❌ Fatal error during sync: ${e.message}", e)
             onStatus("❌ Error: ${e.localizedMessage}")
         }
     }
@@ -300,19 +300,19 @@ object SyncHelper {
 
         for ((idx, url) in candidates.withIndex()) {
             try {
-                Log.d(TAG, "Attempting server ${idx + 1}/${candidates.size}: $url")
+                VersionedLog.d(TAG, "Attempting server ${idx + 1}/${candidates.size}: $url")
                 val cookie = login(url, pin)
-                Log.d(TAG, "✅ Login successful to $url")
+                VersionedLog.d(TAG, "✅ Login successful to $url")
                 return url to cookie
             } catch (e: Exception) {
-                Log.w(TAG, "❌ Server $url failed: ${e.message}")
+                VersionedLog.w(TAG, "❌ Server $url failed: ${e.message}")
                 onStatus("⚠️ $url недоступен, пробую следующий...")
                 lastError = e
             }
         }
 
         val errMsg = "❌ All servers failed: ${lastError?.message}"
-        Log.e(TAG, errMsg)
+        VersionedLog.e(TAG, errMsg)
         throw Exception(errMsg)
     }
 
@@ -340,7 +340,7 @@ object SyncHelper {
             val setCookieHeader = loginResp.header("Set-Cookie")
             val finalUrl = loginResp.request.url
             val bodyPreview = loginResp.peekBody(512).string().replace("\n", " ").replace("\r", " ")
-            Log.d(TAG, "Login response: HTTP ${loginResp.code}, finalUrl=$finalUrl, setCookie=${setCookieHeader != null}, body=$bodyPreview")
+            VersionedLog.d(TAG, "Login response: HTTP ${loginResp.code}, finalUrl=$finalUrl, setCookie=${setCookieHeader != null}, body=$bodyPreview")
             val cookie = cookieStore.firstOrNull { it.name == "session_pin" }?.let {
                 "session_pin=" + it.value
             } ?: throw Exception("Login failed: HTTP " + loginResp.code + ", finalUrl=" + finalUrl + ", session cookie missing")
@@ -390,20 +390,20 @@ object SyncHelper {
         cookie: String,
         targetDay: LocalDate
     ) {
-        Log.d(TAG, "↓ Fetching Health Connect data for $targetDay")
+        VersionedLog.d(TAG, "↓ Fetching Health Connect data for $targetDay")
 
         val startOfDay = targetDay.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant()
         val endOfDay = targetDay.plusDays(1).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant()
 
         // 1. Steps
-        Log.d(TAG, "  📊 Reading steps...")
+        VersionedLog.d(TAG, "  📊 Reading steps...")
         val stepsRequest = AggregateRequest(
             metrics = setOf(StepsRecord.COUNT_TOTAL),
             timeRangeFilter = TimeRangeFilter.between(startOfDay, endOfDay)
         )
         val stepsResp = client.aggregate(stepsRequest)
         val totalSteps = stepsResp[StepsRecord.COUNT_TOTAL] ?: 0L
-        Log.d(TAG, "  ✓ Steps: $totalSteps")
+        VersionedLog.d(TAG, "  ✓ Steps: $totalSteps")
 
         // 2. Sleep — read BEFORE heart rate, so we know the wake/sleep window
         // and can split heart rate into "waking hours" vs "sleep" averages
@@ -411,7 +411,7 @@ object SyncHelper {
         // down by naturally-lower overnight readings and doesn't match what
         // Mi Fitness shows as "average pulse"). Also counts distinct
         // awakening episodes inside the same session.
-        Log.d(TAG, "  📊 Reading sleep...")
+        VersionedLog.d(TAG, "  📊 Reading sleep...")
         val sleepSearchStart = targetDay.minusDays(1).atTime(18, 0).atZone(ZoneId.systemDefault()).toInstant()
         val sleepSearchEnd = targetDay.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant()
         val sleepReq = ReadRecordsRequest(
@@ -429,17 +429,17 @@ object SyncHelper {
                 sleepStart = longest.startTime
                 wakeTime = longest.endTime
                 sleepHours = (longest.endTime.toEpochMilli() - longest.startTime.toEpochMilli()) / 3600000.0
-                Log.d(TAG, "  ✓ Sleep: $sleepHours hours (${sleepRecords.size} sessions, wake time: $wakeTime)")
+                VersionedLog.d(TAG, "  ✓ Sleep: $sleepHours hours (${sleepRecords.size} sessions, wake time: $wakeTime)")
 
                 sleepAwakenings = countSleepAwakenings(longest)
-                Log.d(TAG, "  ✓ Sleep awakenings: $sleepAwakenings")
+                VersionedLog.d(TAG, "  ✓ Sleep awakenings: $sleepAwakenings")
             }
         } else {
-            Log.w(TAG, "  ⚠ Sleep: no data")
+            VersionedLog.w(TAG, "  ⚠ Sleep: no data")
         }
 
         // 3. Heart rate — split into "day" (waking hours only) and "sleep" averages.
-        Log.d(TAG, "  📊 Reading heart rate...")
+        VersionedLog.d(TAG, "  📊 Reading heart rate...")
 
         // Waking-hours window: from wake time to end of day. Falls back to the
         // whole calendar day if we couldn't determine a wake time (no sleep
@@ -447,26 +447,26 @@ object SyncHelper {
         val wakingStart = wakeTime ?: startOfDay
         val hrDayAvg = avgHeartRate(client, wakingStart, endOfDay)
         if (hrDayAvg > 0) {
-            Log.d(TAG, "  ✓ Heart rate (waking hours, $wakingStart .. $endOfDay): $hrDayAvg BPM")
+            VersionedLog.d(TAG, "  ✓ Heart rate (waking hours, $wakingStart .. $endOfDay): $hrDayAvg BPM")
         } else {
-            Log.w(TAG, "  ⚠ Heart rate (waking hours): no data")
+            VersionedLog.w(TAG, "  ⚠ Heart rate (waking hours): no data")
         }
 
         // Sleep window: only meaningful if we found a sleep session.
         val hrSleepAvg = if (sleepStart != null && wakeTime != null) {
             val v = avgHeartRate(client, sleepStart, wakeTime)
             if (v > 0) {
-                Log.d(TAG, "  ✓ Heart rate (sleep, $sleepStart .. $wakeTime): $v BPM")
+                VersionedLog.d(TAG, "  ✓ Heart rate (sleep, $sleepStart .. $wakeTime): $v BPM")
             } else {
-                Log.w(TAG, "  ⚠ Heart rate (sleep window): no data")
+                VersionedLog.w(TAG, "  ⚠ Heart rate (sleep window): no data")
             }
             v
         } else {
-            Log.w(TAG, "  ⚠ Heart rate (sleep): skipped, no sleep session")
+            VersionedLog.w(TAG, "  ⚠ Heart rate (sleep): skipped, no sleep session")
             0L
         }
 
-        Log.i(TAG, "📤 Posting to server: steps=$totalSteps, hr_day=$hrDayAvg BPM, hr_sleep=$hrSleepAvg BPM, " +
+        VersionedLog.i(TAG, "📤 Posting to server: steps=$totalSteps, hr_day=$hrDayAvg BPM, hr_sleep=$hrSleepAvg BPM, " +
                 "sleep=$sleepHours h, awakenings=$sleepAwakenings")
         postToServer(
             url, cookie, targetDay.toString(), sleepHours, hrDayAvg.toInt(), hrSleepAvg.toInt(),
@@ -512,17 +512,17 @@ object SyncHelper {
                     .post(syncBody)
                     .build()
 
-                Log.d(TAG, "Sending POST to $baseUrl/sync for $date")
+                VersionedLog.d(TAG, "Sending POST to $baseUrl/sync for $date")
                 val syncResp = client.newCall(syncReq).execute()
 
                 if (syncResp.isSuccessful) {
                     val responseBody = syncResp.body?.string().orEmpty()
-                    Log.i(TAG, "✅ Server accepted data for $date (HTTP ${syncResp.code}): $responseBody")
+                    VersionedLog.i(TAG, "✅ Server accepted data for $date (HTTP ${syncResp.code}): $responseBody")
                 } else {
                     throw Exception("Server returned HTTP ${syncResp.code}")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to post to server: ${e.message}", e)
+                VersionedLog.e(TAG, "❌ Failed to post to server: ${e.message}", e)
                 throw Exception("Failed to post data to server for $date: ${e.message}")
             }
         }
