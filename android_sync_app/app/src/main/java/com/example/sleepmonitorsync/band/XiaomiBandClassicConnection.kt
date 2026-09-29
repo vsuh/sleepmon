@@ -85,7 +85,7 @@ class XiaomiBandClassicConnection(
     private val credentials: BandCredentials,
 ) {
     companion object {
-        private const val TAG = "XiaomiBandClassic"
+        private val TAG = AppVersion.logTag("XiaomiBandClassic")
 
         private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb")
 
@@ -256,7 +256,7 @@ class XiaomiBandClassicConnection(
         }
 
         var sock: BluetoothSocket? = null
-        Log.i(TAG, "=== v51 (29.09.2026) - XiaomiBand sleep past-fetch ===")
+        Log.i(TAG, "=== " + AppVersion.buildTag("XiaomiBand sleep past-fetch; diagnostics") + " ===")
         for (round in 1..MAX_CONNECT_ROUNDS) {
             sock = openSocket(device, insecure = false)
             if (sock != null) break
@@ -585,6 +585,11 @@ class XiaomiBandClassicConnection(
             HEALTH_SUBTYPE_FILES_OFFERED,
             HEALTH_SUBTYPE_FETCH_PAST -> {
                 val ids = command.health.activityRequestFileIds
+                Log.i(
+                    TAG,
+                    "Health offer: subtype=${command.subtype}, fileIdsBytes=${ids.size()}, " +
+                        "fileCount=${ids.size() / 7}"
+                )
                 if (ids.size() % 7 != 0 || ids.isEmpty()) {
                     Log.d(
                         TAG,
@@ -626,7 +631,7 @@ class XiaomiBandClassicConnection(
             .build()
 
         if (sendEncryptedProtobufCommand(sock, command)) {
-            Log.i(TAG, "↻ Requested past activity files (health subtype=2)")
+            Log.i(TAG, "↻ Requested past activity files (health subtype=2, protobufBytes=4)")
         } else {
             Log.w(TAG, "⚠️ Failed to request past activity files (health subtype=2)")
         }
