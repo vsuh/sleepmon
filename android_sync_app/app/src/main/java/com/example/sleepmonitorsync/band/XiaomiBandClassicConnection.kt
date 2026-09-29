@@ -63,12 +63,9 @@ import java.util.zip.CRC32
  * API. See 10-projects/sleep-monitor/task.md, "Этап B: real trigger found" entry.
  *   1. Phone authenticates, then sends the raw trigger bytes (AES-CTR encrypted).
  *   2. Watch replies with DATA(..., Health{subtype=1, activityRequestFileIds=<7-byte fileIds...>}).
- *   3. Phone queues the returned file IDs and sends DATA(..., Health{subtype=3,
- *      activityRequestFileIds=<one 7-byte fileId>}) for the first queued file.
- *   4. After starting that first file request, phone sends the separate bare
- *      Health{subtype=2} past request. IDs returned by the past response are appended to
- *      the same priority queue.
- *   5. Watch streams each requested file as one or more DATA(channel=Activity(5),
+ *   3. Phone replies DATA(..., Health{subtype=3, activityRequestFileIds=<same fileIds>})
+ *      requesting them.
+ *   4. Watch streams each file's raw bytes as one or more DATA(channel=Activity(5),
  *      ENCRYPTED) chunks, each chunk payload prefixed with [total:u16 LE][num:u16 LE].
  *      When num==total the accumulated bytes are one complete file: 7-byte fileId + 1
  *      padding byte + a version-specific header + body + trailing 4-byte CRC32 (the
@@ -76,7 +73,7 @@ import java.util.zip.CRC32
  *      Confirmed real file types seen so far beyond the two we parse: type=0 subtype=6
  *      (version 2) and type=0 subtype=8 detail=1 (version 4) - likely sleep-related,
  *      not yet reverse-engineered (see task.md, "Этап B: unsupported file types").
- *   6. Phone sends DATA(..., Health{subtype=5, activitySyncAckFileIds=<that fileId>})
+ *   5. Phone sends DATA(..., Health{subtype=5, activitySyncAckFileIds=<that fileId>})
  *      to ack each file as it's fully received and parsed (ack'd regardless of whether
  *      we could parse it, so the band doesn't keep re-offering it forever).
  * All channel=1 (Protobuf) and channel=5 (Activity) traffic after auth is AES-CTR
@@ -185,7 +182,9 @@ class XiaomiBandClassicConnection(
     private var currentChunkTotal = 0
     private var fetchIdleDeferred: CompletableDeferred<Unit>? = null
     private var pastFetchRequested = false
-    private val pendingFileRequests = PriorityQueue<ByteArray> { left, right -> compareFileRequestIds(left, right) }
+    private val pendingFileRequests = PriorityQueue<ByteArray> { left, right ->
+        compareFileRequestIds(left, right)
+    }
     private var fileRequestInFlight = false
 
     // ============================== Auth ==============================
@@ -264,7 +263,7 @@ class XiaomiBandClassicConnection(
         }
 
         var sock: BluetoothSocket? = null
-        Log.i(TAG, "=== " + AppVersion.buildTag("XiaomiBand sleep past-fetch; diagnostics") + " ===")
+        Log.i(TAG, "=== " + AppVersion.buildTag("XiaomiBand sequential file fetch") + " ===")
         for (round in 1..MAX_CONNECT_ROUNDS) {
             sock = openSocket(device, insecure = false)
             if (sock != null) break
@@ -611,7 +610,7 @@ class XiaomiBandClassicConnection(
                 val rawIds = ids.toByteArray()
                 val offeredCount = rawIds.size / 7
                 var offset = 0
-                while (offset < rawIds.size) {
+                while (offset + 7 <= rawIds.size) {
                     val rawId = rawIds.copyOfRange(offset, offset + 7)
                     if (pendingFileRequests.none { it.contentEquals(rawId) }) {
                         pendingFileRequests.add(rawId)
@@ -624,8 +623,10 @@ class XiaomiBandClassicConnection(
                         "queueSize=${pendingFileRequests.size}"
                 )
 
+                // Gadgetbridge starts fetching the first queued today file, and then
+                // immediately asks for past data. Both today/past responses feed the same
+                // one-file-at-a-time queue.
                 requestNextActivityFile(sock)
-
                 if (command.subtype == HEALTH_SUBTYPE_FILES_OFFERED && !pastFetchRequested) {
                     pastFetchRequested = true
                     Log.i(TAG, "↻ Today offer handled after first file request; requesting past activity files now")
@@ -640,17 +641,12 @@ class XiaomiBandClassicConnection(
         val a = XiaomiActivityFileId.from(left)
         val b = XiaomiActivityFileId.from(right)
         return compareValuesBy(
-            a,
-            b,
+            a, b,
             { it.timestamp },
             { it.timezone },
             { it.type },
             { it.subtype },
-            { when (it.detailType) {
-                XiaomiActivityFileId.DETAIL_TYPE_SUMMARY -> 0
-                XiaomiActivityFileId.DETAIL_TYPE_DETAILS -> 1
-                else -> 2
-            } },
+            { it.detailType },
             { it.version },
         )
     }
@@ -658,7 +654,7 @@ class XiaomiBandClassicConnection(
     private fun requestNextActivityFile(sock: BluetoothSocket) {
         if (!fetchActive || fileRequestInFlight || pendingFileRequests.isEmpty()) return
 
-        val rawId = pendingFileRequests.removeFirst()
+        val rawId = pendingFileRequests.poll() ?: return
         val requestCmd = XiaomiProto.Command.newBuilder()
             .setType(CMD_TYPE_HEALTH)
             .setSubtype(HEALTH_SUBTYPE_REQUEST_FILES)
@@ -673,11 +669,14 @@ class XiaomiBandClassicConnection(
             fileRequestInFlight = true
             Log.i(
                 TAG,
-                "→ Requested activity file rawFileId=${rawId.joinToString(\"\") { \"%02x\".format(it) }}, " +
-                    "remainingQueue=${pendingFileRequests.size}"
+                "→ Requested activity file rawFileId=${rawId.joinToString("") { "%02x".format(it) }}, " +
+                      "remainingQueue=${pendingFileRequests.size}"
             )
         } else {
-            Log.w(TAG, "⚠️ Failed to request activity file rawFileId=${rawId.joinToString(\"\") { \"%02x\".format(it) }}")
+            Log.w(
+                TAG,
+                "⚠️ Failed to request activity file rawFileId=${rawId.joinToString("") { "%02x".format(it) }}"
+            )
             pendingFileRequests.add(rawId)
         }
     }
@@ -720,83 +719,89 @@ class XiaomiBandClassicConnection(
                 return
             }
 
-        val bodyForCrc = data.copyOfRange(0, data.size - 4)
-        val crc32 = CRC32().apply { update(bodyForCrc) }.value.toInt()
-        val expectedCrc32 = ((data[data.size - 4].toInt() and 0xFF)) or
-            ((data[data.size - 3].toInt() and 0xFF) shl 8) or
-            ((data[data.size - 2].toInt() and 0xFF) shl 16) or
-            ((data[data.size - 1].toInt() and 0xFF) shl 24)
-
-        if (crc32 != expectedCrc32) {
-            Log.w(TAG, "Activity file CRC32 mismatch (got ${"%08x".format(crc32)}, expected ${"%08x".format(expectedCrc32)})")
-            filesFailed++
-            return
-        }
-
-        val fileId = XiaomiActivityFileId.from(data.copyOfRange(0, 7))
-        Log.i(
-            TAG,
-            "Received file $fileId (${data.size} bytes), rawFileId=${data.copyOfRange(0, 7).joinToString("") { "%02x".format(it) }}"
-        )
-
-        val isDailyCombo = fileId.type == XiaomiActivityFileId.TYPE_ACTIVITY &&
-            fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_DAILY &&
-            (fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_DETAILS || fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_SUMMARY)
-        val isSleepCombo = fileId.type == XiaomiActivityFileId.TYPE_ACTIVITY &&
-            fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_SLEEP &&
-            (fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_DETAILS || fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_SUMMARY)
-        val isKnownCombo = isDailyCombo || isSleepCombo
-
-        if (!isKnownCombo) {
-            filesUnsupported++
-            unsupportedFileDescriptions.add("type=${fileId.type}/subtype=${fileId.subtype}/detail=${fileId.detailType}/v${fileId.version} (${data.size}б)")
-        } else {
-            val parsedOk = when {
-                isDailyCombo && fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_DETAILS -> {
-                    val samples = DailyDetailsParser.parse(fileId, data)
-                    if (samples != null) { perMinuteSamples.addAll(samples); true } else false
-                }
-                isDailyCombo && fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_SUMMARY -> {
-                    val summary = DailySummaryParser.parse(fileId, data)
-                    if (summary != null) { dailySummaries.add(summary); true } else false
-                }
-                isSleepCombo -> {
-                    val sleep = SleepDetailsParser.parse(fileId, data)
-                    if (sleep != null) {
-                        sleepSummaries.add(sleep)
-                        Log.i(
-                            TAG,
-                            "Parsed Xiaomi sleep: fileId=${fileId.raw.joinToString("") { "%02x".format(it) }}, " +
-                                "bed=${sleep.bedTimeSeconds}, wake=${sleep.wakeupTimeSeconds}, " +
-                                "duration=${sleep.sleepDurationMinutes} min, awakenings=${sleep.wakeCount}"
-                        )
-                        true
-                    } else {
-                        Log.w(TAG, "❌ Xiaomi sleep parser returned null for v${fileId.version} (${data.size} bytes)")
-                        false
-                    }
-                }
-                else -> false
+                val bodyForCrc = data.copyOfRange(0, data.size - 4)
+                Log.w(TAG, "Activity file too short (${data.size} bytes), skipping")
+                filesFailed++
+                return
             }
-            if (parsedOk) {
-                filesReceived++
-            } else {
-                // Known type/subtype/detail combo, but this specific file VERSION isn't
-                // supported by our parser (e.g. DailySummaryParser only handles v5) -
-                // that's a gap in our coverage, not a corrupted transfer, so it's
-                // "unsupported" rather than a hard failure.
+
+                val crc32 = CRC32().apply { update(bodyForCrc) }.value.toInt()
+            val expectedCrc32 = ((data[data.size - 4].toInt() and 0xFF)) or
+                ((data[data.size - 3].toInt() and 0xFF) shl 8) or
+                ((data[data.size - 2].toInt() and 0xFF) shl 16) or
+                ((data[data.size - 1].toInt() and 0xFF) shl 24)
+
+            if (crc32 != expectedCrc32) {
+                Log.w(TAG, "Activity file CRC32 mismatch (got ${"%08x".format(crc32)}, expected ${"%08x".format(expectedCrc32)})")
+                filesFailed++
+                return
+            }
+
+            val fileId = XiaomiActivityFileId.from(data.copyOfRange(0, 7))
+            Log.i(
+                TAG,
+                "Received file $fileId (${data.size} bytes), rawFileId=${data.copyOfRange(0, 7).joinToString("") { "%02x".format(it) }}"
+            )
+
+            val isDailyCombo = fileId.type == XiaomiActivityFileId.TYPE_ACTIVITY &&
+                fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_DAILY &&
+                (fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_DETAILS || fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_SUMMARY)
+            val isSleepCombo = fileId.type == XiaomiActivityFileId.TYPE_ACTIVITY &&
+                fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_SLEEP &&
+                (fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_DETAILS || fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_SUMMARY)
+            val isKnownCombo = isDailyCombo || isSleepCombo
+
+            if (!isKnownCombo) {
                 filesUnsupported++
-                unsupportedFileDescriptions.add("type=${fileId.type}/subtype=${fileId.subtype}/detail=${fileId.detailType}/v${fileId.version} (неизвестная версия, ${data.size}б)")
+                unsupportedFileDescriptions.add("type=${fileId.type}/subtype=${fileId.subtype}/detail=${fileId.detailType}/v${fileId.version} (${data.size}б)")
+            } else {
+                val parsedOk = when {
+                    isDailyCombo && fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_DETAILS -> {
+                        val samples = DailyDetailsParser.parse(fileId, data)
+                        if (samples != null) { perMinuteSamples.addAll(samples); true } else false
+                    }
+                    isDailyCombo && fileId.detailType == XiaomiActivityFileId.DETAIL_TYPE_SUMMARY -> {
+                        val summary = DailySummaryParser.parse(fileId, data)
+                        if (summary != null) { dailySummaries.add(summary); true } else false
+                    }
+                    isSleepCombo -> {
+                        val sleep = SleepDetailsParser.parse(fileId, data)
+                        if (sleep != null) {
+                            sleepSummaries.add(sleep)
+                            Log.i(
+                                TAG,
+                                "Parsed Xiaomi sleep: fileId=${fileId.raw.joinToString("") { "%02x".format(it) }}, " +
+                                    "bed=${sleep.bedTimeSeconds}, wake=${sleep.wakeupTimeSeconds}, " +
+                                    "duration=${sleep.sleepDurationMinutes} min, awakenings=${sleep.wakeCount}"
+                            )
+                            true
+                        } else {
+                            Log.w(TAG, "❌ Xiaomi sleep parser returned null for v${fileId.version} (${data.size} bytes)")
+                            false
+                        }
+                    }
+                    else -> false
+                }
+                if (parsedOk) {
+                    filesReceived++
+                } else {
+                    // Known type/subtype/detail combo, but this specific file VERSION isn't
+                    // supported by our parser (e.g. DailySummaryParser only handles v5) -
+                    // that's a gap in our coverage, not a corrupted transfer, so it's
+                    // "unsupported" rather than a hard failure.
+                    filesUnsupported++
+                    unsupportedFileDescriptions.add("type=${fileId.type}/subtype=${fileId.subtype}/detail=${fileId.detailType}/v${fileId.version} (неизвестная версия, ${data.size}б)")
+                }
             }
-        }
 
-        // Do NOT acknowledge the file yet. The caller must first persist/upload the
-        // decoded data successfully. If the backend is unavailable, closing the socket
-        // without an ACK makes the band offer the file again on the next sync instead of
-        // losing it after a successful Bluetooth transfer.
-            if (parsedOkForAck(fileId, isKnownCombo)) {
-                pendingFileAcks.add(fileId.raw)
-            }
+            // Do NOT acknowledge the file yet. The caller must first persist/upload the
+            // decoded data successfully. If the backend is unavailable, closing the socket
+            // without an ACK makes the band offer the file again on the next sync instead of
+            // losing it after a successful Bluetooth transfer.
+                if (parsedOkForAck(fileId, isKnownCombo)) {
+                    pendingFileAcks.add(fileId.raw)
+                }
+
         } finally {
             requestNextActivityFile(sock)
         }
