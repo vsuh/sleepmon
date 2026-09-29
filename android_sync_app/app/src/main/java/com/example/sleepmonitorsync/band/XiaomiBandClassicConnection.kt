@@ -639,13 +639,23 @@ class XiaomiBandClassicConnection(
     private fun compareFileRequestIds(left: ByteArray, right: ByteArray): Int {
         val a = XiaomiActivityFileId.from(left)
         val b = XiaomiActivityFileId.from(right)
+
+        // Match Gadgetbridge's XiaomiActivityFileId.compareTo(): timestamp, timezone,
+        // type, subtype, then detail fetch order (SUMMARY before DETAILS), then version.
+        fun detailFetchOrder(detailType: Int): Int = when (detailType) {
+            1 -> 0 // summary
+            0 -> 1 // details
+            2 -> 2 // GPS track
+            else -> 3
+        }
+
         return compareValuesBy(
             a, b,
             { it.timestamp },
             { it.timezone },
             { it.type },
             { it.subtype },
-            { it.detailType },
+            { detailFetchOrder(it.detailType) },
             { it.version },
         )
     }
