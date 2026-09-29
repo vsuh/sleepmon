@@ -27,7 +27,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 import java.io.OutputStream
-import java.util.ArrayDeque
+import java.util.PriorityQueue
 import java.security.SecureRandom
 import java.util.Locale
 import java.util.UUID
@@ -63,9 +63,12 @@ import java.util.zip.CRC32
  * API. See 10-projects/sleep-monitor/task.md, "Этап B: real trigger found" entry.
  *   1. Phone authenticates, then sends the raw trigger bytes (AES-CTR encrypted).
  *   2. Watch replies with DATA(..., Health{subtype=1, activityRequestFileIds=<7-byte fileIds...>}).
- *   3. Phone replies DATA(..., Health{subtype=3, activityRequestFileIds=<same fileIds>})
- *      requesting them.
- *   4. Watch streams each file's raw bytes as one or more DATA(channel=Activity(5),
+ *   3. Phone queues the returned file IDs and sends DATA(..., Health{subtype=3,
+ *      activityRequestFileIds=<one 7-byte fileId>}) for the first queued file.
+ *   4. After starting that first file request, phone sends the separate bare
+ *      Health{subtype=2} past request. IDs returned by the past response are appended to
+ *      the same priority queue.
+ *   5. Watch streams each requested file as one or more DATA(channel=Activity(5),
  *      ENCRYPTED) chunks, each chunk payload prefixed with [total:u16 LE][num:u16 LE].
  *      When num==total the accumulated bytes are one complete file: 7-byte fileId + 1
  *      padding byte + a version-specific header + body + trailing 4-byte CRC32 (the
@@ -73,7 +76,7 @@ import java.util.zip.CRC32
  *      Confirmed real file types seen so far beyond the two we parse: type=0 subtype=6
  *      (version 2) and type=0 subtype=8 detail=1 (version 4) - likely sleep-related,
  *      not yet reverse-engineered (see task.md, "Этап B: unsupported file types").
- *   5. Phone sends DATA(..., Health{subtype=5, activitySyncAckFileIds=<that fileId>})
+ *   6. Phone sends DATA(..., Health{subtype=5, activitySyncAckFileIds=<that fileId>})
  *      to ack each file as it's fully received and parsed (ack'd regardless of whether
  *      we could parse it, so the band doesn't keep re-offering it forever).
  * All channel=1 (Protobuf) and channel=5 (Activity) traffic after auth is AES-CTR
@@ -182,7 +185,7 @@ class XiaomiBandClassicConnection(
     private var currentChunkTotal = 0
     private var fetchIdleDeferred: CompletableDeferred<Unit>? = null
     private var pastFetchRequested = false
-    private val pendingFileRequests = ArrayDeque<ByteArray>()
+    private val pendingFileRequests = PriorityQueue<ByteArray> { left, right -> compareFileRequestIds(left, right) }
     private var fileRequestInFlight = false
 
     // ============================== Auth ==============================
@@ -611,7 +614,7 @@ class XiaomiBandClassicConnection(
                 while (offset < rawIds.size) {
                     val rawId = rawIds.copyOfRange(offset, offset + 7)
                     if (pendingFileRequests.none { it.contentEquals(rawId) }) {
-                        pendingFileRequests.addLast(rawId)
+                        pendingFileRequests.add(rawId)
                     }
                     offset += 7
                 }
@@ -621,16 +624,35 @@ class XiaomiBandClassicConnection(
                         "queueSize=${pendingFileRequests.size}"
                 )
 
+                requestNextActivityFile(sock)
+
                 if (command.subtype == HEALTH_SUBTYPE_FILES_OFFERED && !pastFetchRequested) {
                     pastFetchRequested = true
-                    Log.i(TAG, "↻ Today offer handled; requesting past activity files now")
+                    Log.i(TAG, "↻ Today offer handled after first file request; requesting past activity files now")
                     sendHealthFetchPast(sock)
                 }
-
-                requestNextActivityFile(sock)
             }
             else -> Log.d(TAG, "Ignoring health subtype=${command.subtype}")
         }
+    }
+
+    private fun compareFileRequestIds(left: ByteArray, right: ByteArray): Int {
+        val a = XiaomiActivityFileId.from(left)
+        val b = XiaomiActivityFileId.from(right)
+        return compareValuesBy(
+            a,
+            b,
+            { it.timestamp },
+            { it.timezone },
+            { it.type },
+            { it.subtype },
+            { when (it.detailType) {
+                XiaomiActivityFileId.DETAIL_TYPE_SUMMARY -> 0
+                XiaomiActivityFileId.DETAIL_TYPE_DETAILS -> 1
+                else -> 2
+            } },
+            { it.version },
+        )
     }
 
     private fun requestNextActivityFile(sock: BluetoothSocket) {
@@ -656,7 +678,7 @@ class XiaomiBandClassicConnection(
             )
         } else {
             Log.w(TAG, "⚠️ Failed to request activity file rawFileId=${rawId.joinToString(\"\") { \"%02x\".format(it) }}")
-            pendingFileRequests.addFirst(rawId)
+            pendingFileRequests.add(rawId)
         }
     }
 
