@@ -21,7 +21,7 @@
 
 ## 2. Текущий статус
 
-**Рабочая версия Android: v58 (29.09.2026).**
+**Рабочая версия Android: v59 (29.09.2026).**
 
 Подтверждено реальным E2E-тестом:
 
@@ -594,9 +594,9 @@ APK локально не собирался; после изменения тр
 - после завершения каждого file stream выбирается следующий ID из очереди;
 - IDs, полученные от past-response, добавляются в ту же очередь.
 
-## 34. Android — sequential one-file fetch ported from Gadgetbridge
+## 34. Android v59 — sequential one-file fetch ported from Gadgetbridge
 
-В v58 схема получения activity-файлов доведена до фактической реализации Gadgetbridge.
+В v59 схема получения activity-файлов доведена до фактической реализации Gadgetbridge.
 
 Подтверждено upstream:
 - `XiaomiHealthService.handleActivityFetchResponse()` передаёт все file IDs в `XiaomiActivityFileFetcher`;
