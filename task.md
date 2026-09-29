@@ -644,4 +644,4 @@ SyncWorker SyncHelper XiaomiBandClassic SleepMonitor
 
 Добавлен `VersionedLog`: он сохраняет стабильные TAG и добавляет `[v61 (29.09.2026)]` в каждое сообщение. Это позволяет одновременно фильтровать поток по компоненту и однозначно определять сборку по содержимому строки.
 
-Затронуты `XiaomiBandClassicConnection`, `SyncHelper`, `SyncWorker`, `MainActivity`, `AppVersion`; APK в контейнере не собирался.
+Затронуты `XiaomiBandClassicConnection`, `SyncHelper`, `SyncWorker`, `MainActivity`, `AppVersion` и новый `VersionedLog.kt`; APK в контейнере не собирался.
