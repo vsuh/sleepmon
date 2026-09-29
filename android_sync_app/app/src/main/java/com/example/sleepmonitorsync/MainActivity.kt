@@ -1,5 +1,6 @@
-import com.example.sleepmonitorsync.VersionedLog
 package com.example.sleepmonitorsync
+
+import com.example.sleepmonitorsync.VersionedLog
 
 import android.Manifest
 import android.os.Build
