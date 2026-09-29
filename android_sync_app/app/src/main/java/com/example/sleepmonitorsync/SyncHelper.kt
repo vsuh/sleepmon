@@ -29,9 +29,9 @@ object SyncHelper {
      * uploads the decoded daily aggregates to /sync.
      *
      * The band is the source of truth for steps/heart-rate in the new pipeline.
-     * Sleep and sleep phases remain zero here until the corresponding Xiaomi activity
-     * file types are reverse-engineered; the backend fill-once merge keeps any
-     * already recorded sleep values intact.
+     * The direct Xiaomi SPP path also requests the band's "past" activity set after
+     * "today"; the returned subtype=8 sleep record is mapped to its local wake-up date
+     * and contributes sleep duration, awakenings, and sleep-window heart rate.
      */
     suspend fun performBandSync(
         context: android.content.Context,
@@ -41,7 +41,7 @@ object SyncHelper {
         onStatus: (String) -> Unit
     ): Boolean {
         return XiaomiBandClassicConnection.withExclusiveSppOperation {
-            Log.i(TAG, "=== v46 (28.09.2026) - auth cookie compile fix ===")
+            Log.i(TAG, "=== v51 (29.09.2026) - Xiaomi past sleep fetch ===")
             Log.i(TAG, "Xiaomi SPP operation lock acquired")
             val credentials = BandCredentials.load(context)
         val authKey = credentials.authKeyHex.trim().removePrefix("0x").removePrefix("0X")
@@ -73,7 +73,10 @@ object SyncHelper {
             }
 
             val result = fetch.getOrThrow()
-            onStatus("📊 Получено файлов: ${result.filesReceived}, минутных записей: ${result.perMinuteSamples.size}")
+            onStatus(
+                "📊 Получено файлов: ${result.filesReceived}, минутных записей: ${result.perMinuteSamples.size}, " +
+                    "sleep-файлов: ${result.sleepSummaries.size}"
+            )
 
             val days = aggregateBandSamples(result.perMinuteSamples, result.dailySummaries, result.sleepSummaries)
             if (days.isNotEmpty()) {

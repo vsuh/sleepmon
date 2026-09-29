@@ -94,6 +94,7 @@ class XiaomiBandClassicConnection(
         private const val CMD_SUBTYPE_NONCE = 26
         private const val CMD_SUBTYPE_AUTH = 27
         private const val HEALTH_SUBTYPE_FILES_OFFERED = 1
+        private const val HEALTH_SUBTYPE_FETCH_PAST = 2
         private const val HEALTH_SUBTYPE_REQUEST_FILES = 3
         private const val HEALTH_SUBTYPE_ACK_FILE = 5
 
@@ -177,6 +178,7 @@ class XiaomiBandClassicConnection(
     private var currentChunkBuffer = ByteArray(0)
     private var currentChunkTotal = 0
     private var fetchIdleDeferred: CompletableDeferred<Unit>? = null
+    private var pastFetchRequested = false
 
     // ============================== Auth ==============================
 
@@ -254,7 +256,7 @@ class XiaomiBandClassicConnection(
         }
 
         var sock: BluetoothSocket? = null
-        Log.i(TAG, "=== v39 (26.09.2026) - XiaomiBand ===")
+        Log.i(TAG, "=== v51 (29.09.2026) - XiaomiBand sleep past-fetch ===")
         for (round in 1..MAX_CONNECT_ROUNDS) {
             sock = openSocket(device, insecure = false)
             if (sock != null) break
@@ -533,6 +535,7 @@ class XiaomiBandClassicConnection(
         pendingFileAcks.clear()
         currentChunkBuffer = ByteArray(0)
         currentChunkTotal = 0
+        pastFetchRequested = false
 
         return try {
             withTimeout(FETCH_OVERALL_TIMEOUT_MS) {
@@ -577,24 +580,54 @@ class XiaomiBandClassicConnection(
 
     private fun handleHealthCommand(sock: BluetoothSocket, command: XiaomiProto.Command) {
         if (!command.hasHealth()) return
+
         when (command.subtype) {
-            HEALTH_SUBTYPE_FILES_OFFERED -> {
+            HEALTH_SUBTYPE_FILES_OFFERED,
+            HEALTH_SUBTYPE_FETCH_PAST -> {
                 val ids = command.health.activityRequestFileIds
                 if (ids.size() % 7 != 0 || ids.isEmpty) {
-                    Log.d(TAG, "Health message subtype=1 with no/invalid fileIds (${ids.size()} bytes) - probably our own echoed trigger, ignoring")
-                    return
-                }
-                Log.i(TAG, "Band offered ${ids.size() / 7} file(s), requesting them")
-                val requestCmd = XiaomiProto.Command.newBuilder()
-                    .setType(CMD_TYPE_HEALTH)
-                    .setSubtype(HEALTH_SUBTYPE_REQUEST_FILES)
-                    .setHealth(
-                        XiaomiProto.Health.newBuilder().setActivityRequestFileIds(ids)
+                    Log.d(
+                        TAG,
+                        "Health message subtype=${command.subtype} with no/invalid fileIds (${ids.size} bytes) - ignoring"
                     )
-                    .build()
-                sendEncryptedProtobufCommand(sock, requestCmd)
+                } else {
+                    Log.i(
+                        TAG,
+                        "Band offered ${ids.size() / 7} file(s) in health subtype=${command.subtype}, requesting them"
+                    )
+                    val requestCmd = XiaomiProto.Command.newBuilder()
+                        .setType(CMD_TYPE_HEALTH)
+                        .setSubtype(HEALTH_SUBTYPE_REQUEST_FILES)
+                        .setHealth(
+                            XiaomiProto.Health.newBuilder().setActivityRequestFileIds(ids)
+                        )
+                        .build()
+                    sendEncryptedProtobufCommand(sock, requestCmd)
+                }
+
+                // Gadgetbridge's XiaomiHealthService performs the second "past" fetch
+                // immediately after handling the "today" response. Subtype=2 is a bare
+                // Command{type=8, subtype=2}; the response uses subtype=2 again and carries
+                // its file IDs in Health.activityRequestFileIds.
+                if (command.subtype == HEALTH_SUBTYPE_FILES_OFFERED && !pastFetchRequested) {
+                    pastFetchRequested = true
+                    sendHealthFetchPast(sock)
+                }
             }
             else -> Log.d(TAG, "Ignoring health subtype=${command.subtype}")
+        }
+    }
+
+    private fun sendHealthFetchPast(sock: BluetoothSocket) {
+        val command = XiaomiProto.Command.newBuilder()
+            .setType(CMD_TYPE_HEALTH)
+            .setSubtype(HEALTH_SUBTYPE_FETCH_PAST)
+            .build()
+
+        if (sendEncryptedProtobufCommand(sock, command)) {
+            Log.i(TAG, "↻ Requested past activity files (health subtype=2)")
+        } else {
+            Log.w(TAG, "⚠️ Failed to request past activity files (health subtype=2)")
         }
     }
 
