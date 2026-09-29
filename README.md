@@ -59,6 +59,7 @@ Obsidian in Docker
 sleepmon/
 ├── app/                         # FastAPI + HTML UI
 ├── android_sync_app/            # Android Companion App
+├── tools/dbtool/                # git-субмодуль: бэкап/восстановление карточек в SQLite (vsuh/sleepmon-dbtool)
 ├── docker-compose.yml
 ├── .env.example
 ├── task.md                      # рабочая задача и техническая история
@@ -700,9 +701,37 @@ Secure SPP connect() failed: read failed, socket might closed or timeout
 
 ---
 
-# 15. Связанные документы
+# 15. Резервное копирование и восстановление карточек
+
+Бэкап/восстановление ежедневных карточек (`55-sleepmon/**/*.md`) вынесено в
+отдельный git-субмодуль `tools/dbtool` ([vsuh/sleepmon-dbtool][dbtool-repo]),
+чтобы схема frontmatter могла меняться со временем, не затрагивая сам
+инструмент бэкапа: весь frontmatter карточки хранится в SQLite целиком как
+JSON, без жёсткой привязки к конкретным полям.
+
+Сервис `dbtool` в `docker-compose.yml` читает vault напрямую с диска (в
+обход Local REST API — так бэкап работает и тогда, когда `obsidian`/`app`
+недоступны) и раз в сутки в 01:00 запускает инкрементальный бэкап по cron
+внутри контейнера в `/backups/sleepmon.sqlite` (примонтирован с хоста на
+`/mnt/hdd/backups/sleepmon`).
+
+Ручной запуск:
+
+```bash
+docker compose exec dbtool backup.sh
+docker compose exec dbtool restore.sh --dry-run
+```
+
+Подробности — в README субмодуля: `tools/dbtool/README.md`.
+
+[dbtool-repo]: https://github.com/vsuh/sleepmon-dbtool
+
+---
+
+# 16. Связанные документы
 
 - `task.md` — текущая задача, архитектурные решения, E2E-результаты и история принципиальных изменений.
 - `.env.example` — параметры серверной конфигурации.
 - `android_sync_app/` — исходный код Android Companion App.
+- `tools/dbtool/` — субмодуль бэкапа/восстановления карточек в SQLite.
 

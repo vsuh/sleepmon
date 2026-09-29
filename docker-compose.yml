@@ -28,3 +28,14 @@ services:
     depends_on:
       - obsidian
     restart: unless-stopped
+
+  dbtool:
+    build:
+      context: ./tools/dbtool
+    container_name: sleepmon_dbtool
+    environment:
+      - TZ=Europe/Moscow
+    volumes:
+      - /mnt/hdd/syncthing/AI.obsdn:/vault:rw
+      - /mnt/hdd/syncthing/backups/sleepmon:/backups:rw
+    restart: unless-stopped

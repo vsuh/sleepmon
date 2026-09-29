@@ -6,3 +6,5 @@ __pycache__/
 *.pyc
 graphify-out/
 *.log
+*.zip
+

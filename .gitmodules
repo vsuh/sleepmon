@@ -1,0 +1,3 @@
+[submodule "tools/dbtool"]
+	path = tools/dbtool
+	url = https://github.com/vsuh/sleepmon-dbtool.git
