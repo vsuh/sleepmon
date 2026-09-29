@@ -1,5 +1,6 @@
-import com.example.sleepmonitorsync.VersionedLog
 package com.example.sleepmonitorsync
+
+import com.example.sleepmonitorsync.VersionedLog
 
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.records.HeartRateRecord
