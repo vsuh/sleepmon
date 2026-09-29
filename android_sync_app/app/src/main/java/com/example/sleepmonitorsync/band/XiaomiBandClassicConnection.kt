@@ -585,10 +585,10 @@ class XiaomiBandClassicConnection(
             HEALTH_SUBTYPE_FILES_OFFERED,
             HEALTH_SUBTYPE_FETCH_PAST -> {
                 val ids = command.health.activityRequestFileIds
-                if (ids.size() % 7 != 0 || ids.isEmpty) {
+                if (ids.size() % 7 != 0 || ids.isEmpty()) {
                     Log.d(
                         TAG,
-                        "Health message subtype=${command.subtype} with no/invalid fileIds (${ids.size} bytes) - ignoring"
+                        "Health message subtype=${command.subtype} with no/invalid fileIds (${ids.size()} bytes) - ignoring"
                     )
                     return
                 }
