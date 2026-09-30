@@ -26,6 +26,8 @@ object SleepDetailsParser {
         val rrPacketCount: Int = 0,
         val summaryPacketCount: Int = 0,
         val stagePacketCount: Int = 0,
+        val type10HrCount: Int = 0,
+        val type10HrAverage: Int = 0,
         val packetTrace: String = "",
     )
 
@@ -86,6 +88,8 @@ object SleepDetailsParser {
             var rrPacketCount = 0
             var summaryPacketCount = 0
             var stagePacketCount = 0
+            var type10HrSum = 0
+            var type10HrCount = 0
             val packetTrace = mutableListOf<String>()
             val packetTypeCounts = linkedMapOf<Int, Int>()
             val packetPayloadTrace = mutableListOf<String>()
@@ -159,16 +163,32 @@ object SleepDetailsParser {
                     type == 0x11 -> {
                         stagePacketCount++
                     }
+                    type == 0x0A && dataLen % 4 == 0 -> {
+                        // Mi Band 9 Pro sleep files use type=10 records in 4-byte units.
+                        // The second little-endian u16 has a low byte in the plausible HR range;
+                        // observed payloads include 0x004B=75, 0x004F=79, 0x107B=123, etc.
+                        // The high byte behaves as a status/flags byte, so only the low byte is
+                        // used as the candidate heart-rate value.
+                        for (offset in 0 until dataLen step 4) {
+                            val packedHr = (data[offset + 2].toInt() and 0xFF) or
+                                ((data[offset + 3].toInt() and 0xFF) shl 8)
+                            val hr = packedHr and 0xFF
+                            if (hr in 30..220) {
+                                type10HrSum += hr
+                                type10HrCount++
+                            }
+                        }
+                    }
                 }
             }
 
             if (sleepDurationMinutes == 0 && wakeupTime > bedTime) {
                 sleepDurationMinutes = (wakeupTime - bedTime) / 60
             }
-            val pulseAvgSleep = if (rrIntervalsMs.isNotEmpty()) {
-                rrIntervalsMs.map { 60000.0 / it }.average().toInt()
-            } else {
-                0
+            val pulseAvgSleep = when {
+                type10HrCount > 0 -> type10HrSum / type10HrCount
+                rrIntervalsMs.isNotEmpty() -> rrIntervalsMs.map { 60000.0 / it }.average().toInt()
+                else -> 0
             }
             SleepSummary(
                 bedTimeSeconds = bedTime,
@@ -180,6 +200,8 @@ object SleepDetailsParser {
                 rrPacketCount = rrPacketCount,
                 summaryPacketCount = summaryPacketCount,
                 stagePacketCount = stagePacketCount,
+                type10HrCount = type10HrCount,
+                type10HrAverage = if (type10HrCount > 0) type10HrSum / type10HrCount else 0,
                 packetTrace = ("types=" + packetTypeCounts.entries.joinToString(",") { entry -> entry.key.toString() + ":" + entry.value } +
                     "|payload=" + packetPayloadTrace.joinToString(";") +
                     "|trace=" + packetTrace.joinToString(";")).take(4000),
