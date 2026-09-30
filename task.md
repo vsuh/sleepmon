@@ -683,3 +683,8 @@ SyncWorker SyncHelper XiaomiBandClassic SleepMonitor
 ## 37. Android v64 — Logcat диагностика sleep RR
 
 Лог получения sleep-файла теперь дополнительно выводит `pulse_sleep` и количество распознанных RR-интервалов. Это позволит в следующем E2E напрямую увидеть, что pulse извлечён именно из sleep packet type=1, а не из минутной activity статистики.
+
+
+## 38. Android v64 — единый build tag
+
+AppVersion повышен с v63 до **v64 (30.09.2026)**, чтобы новый APK однозначно отличался в Logcat. APK в рабочем контейнере не собирался; сборка остаётся локальной на стороне пользователя.
