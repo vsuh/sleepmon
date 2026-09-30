@@ -671,3 +671,10 @@ SyncWorker SyncHelper XiaomiBandClassic SleepMonitor
 После E2E v63 подтверждено, что sleep-файл subtype=8/detailType=1/version=4 получен целиком и содержит sleep summary. Для корректного извлечения sleep pulse parser теперь читает packet type=1 с RR-интервалами, переводит их из 10-мс единиц в миллисекунды и вычисляет средний пульс как среднее мгновенных 60000/RR. Добавлены поля pulseAvgSleep и rrIntervalCount. Диапазон RR для расчёта ограничен 300…2000 мс (30…200 BPM).
 
 На этом шаге изменён только SleepDetailsParser; агрегатор и Logcat ещё не переключены на новое поле. Следующим изменением нужно передать pulseAvgSleep в дневную агрегацию и явно логировать число RR.
+
+
+## 36. Android v64 — aggregate использует RR-derived sleep pulse
+
+После parser-изменения агрегатор переключён на SleepSummary.pulseAvgSleep как основной источник pulse_avg_sleep. Старый расчёт по минутным activity HR сохранён только как fallback, если sleep-файл не содержит пригодных RR-интервалов.
+
+Это устраняет подтверждённое расхождение v63, где sleep pulse считался по coarse minute samples и дал 60 BPM.
