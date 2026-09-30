@@ -26,6 +26,7 @@ object SleepDetailsParser {
         val rrPacketCount: Int = 0,
         val summaryPacketCount: Int = 0,
         val stagePacketCount: Int = 0,
+        val packetTrace: String = "",
     )
 
     fun parse(fileId: XiaomiActivityFileId, fileBytes: ByteArray): SleepSummary? {
@@ -85,6 +86,7 @@ object SleepDetailsParser {
             var rrPacketCount = 0
             var summaryPacketCount = 0
             var stagePacketCount = 0
+            val packetTrace = mutableListOf<String>()
             val rrIntervalsMs = mutableListOf<Int>()
 
             // Sleep stage packets are preceded by the fixed FF FC FA FB marker.
@@ -103,6 +105,7 @@ object SleepDetailsParser {
                 }
                 if (!markerFound) break
 
+                val packetStart = buf.position()
                 buf.position(buf.position() + 4)
                 buf.get() // packet header length
                 if (buf.remaining() < 12) break
@@ -112,6 +115,7 @@ object SleepDetailsParser {
                 // Xiaomi sleep packet dataLen is big-endian (unlike the surrounding packet fields).
                 val dataLen = ((buf.get().toInt() and 0xFF) shl 8) or
                     (buf.get().toInt() and 0xFF)
+                packetTrace += "$packetStart:type=$type,len=$dataLen,remain=${buf.remaining()}"
 
                 // These packet types carry no data bytes despite the nominal length fields.
                 if (type == 0x2 || type == 0x3 || type == 0x9 || type == 0xc ||
@@ -119,7 +123,10 @@ object SleepDetailsParser {
                     continue
                 }
 
-                if (dataLen > buf.remaining()) break
+                if (dataLen > buf.remaining()) {
+                    packetTrace += "$packetStart:TRUNCATED type=$type,len=$dataLen,remain=${buf.remaining()}"
+                    break
+                }
                 val data = ByteArray(dataLen)
                 buf.get(data)
 
@@ -166,6 +173,7 @@ object SleepDetailsParser {
                 rrPacketCount = rrPacketCount,
                 summaryPacketCount = summaryPacketCount,
                 stagePacketCount = stagePacketCount,
+                packetTrace = packetTrace.joinToString(";").take(1000),
             )
         } catch (_: BufferUnderflowException) {
             null
