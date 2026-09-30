@@ -776,7 +776,8 @@ class XiaomiBandClassicConnection(
                                 TAG,
                                 "Parsed Xiaomi sleep: fileId=${fileId.raw.joinToString("") { "%02x".format(it) }}, " +
                                     "bed=${sleep.bedTimeSeconds}, wake=${sleep.wakeupTimeSeconds}, " +
-                                    "duration=${sleep.sleepDurationMinutes} min, awakenings=${sleep.wakeCount}"
+                                    "duration=${sleep.sleepDurationMinutes} min, awakenings=${sleep.wakeCount}, " +
+                                    "pulse_sleep=${sleep.pulseAvgSleep} BPM, rr=${sleep.rrIntervalCount}"
                             )
                             true
                         } else {
