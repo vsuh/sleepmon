@@ -781,7 +781,7 @@ class XiaomiBandClassicConnection(
                                     "rr_packets=${sleep.rrPacketCount}, summary_packets=${sleep.summaryPacketCount}, " +
                                     "stage_packets=${sleep.stagePacketCount}, " +
                                     "type10_hr_count=${sleep.type10HrCount}, type10_hr_avg=${sleep.type10HrAverage}, " +
-                                    "type10_candidates=${sleep.type10CandidateStats}, " +
+                                    "type10_candidates=${sleep.type10CandidateStats}, type10_flags=${sleep.type10FlagStats}, " +
                                     "trace=${sleep.packetTrace}"
                             )
                             true
