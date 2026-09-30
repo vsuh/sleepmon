@@ -664,3 +664,10 @@ SyncWorker SyncHelper XiaomiBandClassic SleepMonitor
 Источником порядка служит upstream Gadgetbridge: `XiaomiActivityFileId.compareTo()` и `XiaomiActivityFileFetcher.triggerNextFetch()`.
 
 Номер `AppVersion.NUMBER` повышен с v62 до **v63**. APK в контейнере не собирался.
+
+
+## 35. Android v64 — parser sleep RR
+
+После E2E v63 подтверждено, что sleep-файл subtype=8/detailType=1/version=4 получен целиком и содержит sleep summary. Для корректного извлечения sleep pulse parser теперь читает packet type=1 с RR-интервалами, переводит их из 10-мс единиц в миллисекунды и вычисляет средний пульс как среднее мгновенных 60000/RR. Добавлены поля pulseAvgSleep и rrIntervalCount. Диапазон RR для расчёта ограничен 300…2000 мс (30…200 BPM).
+
+На этом шаге изменён только SleepDetailsParser; агрегатор и Logcat ещё не переключены на новое поле. Следующим изменением нужно передать pulseAvgSleep в дневную агрегацию и явно логировать число RR.
