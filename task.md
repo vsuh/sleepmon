@@ -739,3 +739,10 @@ E2E v65 дал важный результат: marker уже успешно н�
 - type=1 увеличивает `rrPacketCount`, type=16 — `summaryPacketCount`, type=17 — `stagePacketCount`.
 
 Это изменение отделяет две проблемы: duration уже локализована и исправляется endian-фактом; для отсутствующего sleep pulse следующий E2E должен показать, были ли вообще получены type=1 RR-пакеты. APK в рабочем контейнере не собирался.
+
+
+## 43. Android v65 — Logcat расширен packet-type diagnostics
+
+После исправления Summary parser добавлено диагностическое логирование результатов разбора sleep-файла: `rr_packets`, `summary_packets` и `stage_packets`. Это позволяет следующим E2E отличить отсутствие type=1 RR в самом файле от ошибки интерпретации RR payload.
+
+Изменён только Logcat в `XiaomiBandClassicConnection`; номер build tag перед следующим APK-тестом будет повышен отдельно. APK в рабочем контейнере не собирался.
