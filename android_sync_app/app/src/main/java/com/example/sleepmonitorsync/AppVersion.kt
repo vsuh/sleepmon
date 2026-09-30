@@ -2,7 +2,7 @@ package com.example.sleepmonitorsync
 
 object AppVersion {
     /** Single source of truth for the Android app version shown in UI and Logcat. */
-    const val NUMBER = 68
+    const val NUMBER = 69
     const val DATE = "30.09.2026"
 
     val label: String
