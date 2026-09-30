@@ -779,7 +779,7 @@ class XiaomiBandClassicConnection(
                                     "duration=${sleep.sleepDurationMinutes} min, awakenings=${sleep.wakeCount}, " +
                                     "pulse_sleep=${sleep.pulseAvgSleep} BPM, rr=${sleep.rrIntervalCount}, " +
                                     "rr_packets=${sleep.rrPacketCount}, summary_packets=${sleep.summaryPacketCount}, " +
-                                    "stage_packets=${sleep.stagePacketCount}"
+                                    "stage_packets=${sleep.stagePacketCount}, trace=${sleep.packetTrace}"
                             )
                             true
                         } else {
