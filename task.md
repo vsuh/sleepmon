@@ -704,3 +704,19 @@ E2E v64 показал, что sleep-файл приходит полность�
 Источник формата: актуальный `Gadgetbridge SleepDetailsParser`, где `dataLen` разбирается как big-endian, а type=1 действительно содержит RR-дельты в единицах 10 мс. citeturn10view0
 
 Следующий E2E-тест должен показать ненулевой `rr` и `pulse_sleep`; APK локально не собирался. Номер `AppVersion` пока остаётся v64: отдельное изменение build tag не применилось из-за ограничения инструмента записи и должно быть выполнено перед сборкой.
+
+
+## 40. Android v65 — исправлен порядок маркера sleep packet
+
+E2E-сборка после исправления `dataLen` показала `pulse_sleep=0, rr=0`. Проверка актуального Gadgetbridge выявила вторую конкретную ошибку: parser использует `ByteBuffer.LITTLE_ENDIAN` и ищет маркер через `getInt() == 0xfffcfafb`. Следовательно, физические байты маркера в файле — `FB FA FC FF` при побайтовом поиске.
+
+В SleepDetailsParser.kt исправлен поиск marker:
+- было: `FF FC FA FB`;
+- стало: `FB FA FC FF`;
+- чтение `dataLen` остаётся big-endian, как требует формат Gadgetbridge.
+
+Именно отсутствие совпадения marker объясняет, почему v64 вообще не доходил до type=1 RR и type=16 Summary, несмотря на корректно полученный 12338-байтовый sleep-файл.
+
+Источник: актуальный Gadgetbridge SleepDetailsParser, `readStagePacketHeader()`, где LITTLE_ENDIAN buffer сравнивается с `0xfffcfafb`. citeturn5view0
+
+Следующий E2E-тест должен впервые показать ненулевые `rr` и фактический `wakeCount`. APK локально после этого изменения ещё не собирался.
