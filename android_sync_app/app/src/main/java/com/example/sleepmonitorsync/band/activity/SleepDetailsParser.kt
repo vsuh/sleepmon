@@ -87,6 +87,8 @@ object SleepDetailsParser {
             var summaryPacketCount = 0
             var stagePacketCount = 0
             val packetTrace = mutableListOf<String>()
+            val packetTypeCounts = linkedMapOf<Int, Int>()
+            val packetPayloadTrace = mutableListOf<String>()
             val rrIntervalsMs = mutableListOf<Int>()
 
             // Sleep stage packets are preceded by the fixed FF FC FA FB marker.
@@ -115,6 +117,7 @@ object SleepDetailsParser {
                 // Xiaomi sleep packet dataLen is big-endian (unlike the surrounding packet fields).
                 val dataLen = ((buf.get().toInt() and 0xFF) shl 8) or
                     (buf.get().toInt() and 0xFF)
+                packetTypeCounts[type] = (packetTypeCounts[type] ?: 0) + 1
                 packetTrace += "$packetStart:type=$type,len=$dataLen,remain=${buf.remaining()}"
 
                 // These packet types carry no data bytes despite the nominal length fields.
@@ -129,6 +132,10 @@ object SleepDetailsParser {
                 }
                 val data = ByteArray(dataLen)
                 buf.get(data)
+                if (type == 10 || type == 11 || type == 16 || type == 17) {
+                    val preview = data.take(64).joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
+                    packetPayloadTrace += "type=$type,len=$dataLen,$preview"
+                }
 
                 when {
                     type == 1 -> {
@@ -173,7 +180,9 @@ object SleepDetailsParser {
                 rrPacketCount = rrPacketCount,
                 summaryPacketCount = summaryPacketCount,
                 stagePacketCount = stagePacketCount,
-                packetTrace = packetTrace.joinToString(";").take(1000),
+                packetTrace = ("types=" + packetTypeCounts.entries.joinToString(",") { entry -> entry.key.toString() + ":" + entry.value } +
+                    "|payload=" + packetPayloadTrace.joinToString(";") +
+                    "|trace=" + packetTrace.joinToString(";")).take(4000),
             )
         } catch (_: BufferUnderflowException) {
             null
