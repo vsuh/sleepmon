@@ -23,6 +23,9 @@ object SleepDetailsParser {
         val wakeCount: Int,
         val pulseAvgSleep: Int = 0,
         val rrIntervalCount: Int = 0,
+        val rrPacketCount: Int = 0,
+        val summaryPacketCount: Int = 0,
+        val stagePacketCount: Int = 0,
     )
 
     fun parse(fileId: XiaomiActivityFileId, fileBytes: ByteArray): SleepSummary? {
@@ -79,6 +82,9 @@ object SleepDetailsParser {
 
             var wakeCount = 0
             var sleepDurationMinutes = 0
+            var rrPacketCount = 0
+            var summaryPacketCount = 0
+            var stagePacketCount = 0
             val rrIntervalsMs = mutableListOf<Int>()
 
             // Sleep stage packets are preceded by the fixed FF FC FA FB marker.
@@ -119,6 +125,7 @@ object SleepDetailsParser {
 
                 when {
                     type == 1 -> {
+                        rrPacketCount++
                         // Xiaomi Band sleep pulse is stored as RR intervals in 10 ms units.
                         for (rawDelta in data) {
                             val intervalMs = (rawDelta.toInt() and 0xFF) * 10
@@ -128,10 +135,15 @@ object SleepDetailsParser {
                         }
                     }
                     type == 0x10 && dataLen >= 13 -> {
-                        // Summary: low nibble of byte 0 is wake_count; bytes 1..2 are sleep duration.
+                        // Summary payload is BIG-endian even though the outer file buffer is little-endian.
+                        // Gadgetbridge parses these fields from a BIG_ENDIAN ByteBuffer.
+                        summaryPacketCount++
                         wakeCount = data[0].toInt() and 0x0F
-                        sleepDurationMinutes = (data[1].toInt() and 0xFF) or
-                            ((data[2].toInt() and 0xFF) shl 8)
+                        sleepDurationMinutes = ((data[1].toInt() and 0xFF) shl 8) or
+                            (data[2].toInt() and 0xFF)
+                    }
+                    type == 0x11 -> {
+                        stagePacketCount++
                     }
                 }
             }
@@ -151,6 +163,9 @@ object SleepDetailsParser {
                 wakeCount = wakeCount,
                 pulseAvgSleep = pulseAvgSleep,
                 rrIntervalCount = rrIntervalsMs.size,
+                rrPacketCount = rrPacketCount,
+                summaryPacketCount = summaryPacketCount,
+                stagePacketCount = stagePacketCount,
             )
         } catch (_: BufferUnderflowException) {
             null
