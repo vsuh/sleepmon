@@ -727,3 +727,15 @@ E2E-сборка после исправления `dataLen` показала `p
 После исправления marker parser версия приложения повышена с v64 до **v65 (30.09.2026)**. Это нужно, чтобы следующий APK и его Logcat нельзя было спутать с уже протестированным v64.
 
 Перед следующим E2E требуется собрать и установить именно v65.
+
+
+## 42. Android v65 — исправлен endian summary и добавлена диагностика packet types
+
+E2E v65 дал важный результат: marker уже успешно находится и type=16 Summary разбирается, но duration получилась **57857 мин**. Это не ошибка поиска marker: число 57857 = `0xE201`, то есть parser прочитал bytes `01 E2` как little-endian. В Gadgetbridge payload Summary разбирается отдельным **BIG_ENDIAN** ByteBuffer, поэтому реальные `01 E2` означают **482 минуты**, то есть подтверждённую длительность сна 8 ч 02 мин.
+
+В SleepDetailsParser исправлено:
+- type=16 Summary: sleep duration bytes 1..2 теперь читаются big-endian;
+- добавлены диагностические счётчики `rrPacketCount`, `summaryPacketCount`, `stagePacketCount`;
+- type=1 увеличивает `rrPacketCount`, type=16 — `summaryPacketCount`, type=17 — `stagePacketCount`.
+
+Это изменение отделяет две проблемы: duration уже локализована и исправляется endian-фактом; для отсутствующего sleep pulse следующий E2E должен показать, были ли вообще получены type=1 RR-пакеты. APK в рабочем контейнере не собирался.
