@@ -86,10 +86,10 @@ object SleepDetailsParser {
                 var markerFound = false
                 while (buf.remaining() >= 4) {
                     val p = buf.position()
-                    if ((buf.get(p).toInt() and 0xFF) == 0xFF &&
-                        (buf.get(p + 1).toInt() and 0xFF) == 0xFC &&
-                        (buf.get(p + 2).toInt() and 0xFF) == 0xFA &&
-                        (buf.get(p + 3).toInt() and 0xFF) == 0xFB) {
+                    if ((buf.get(p).toInt() and 0xFF) == 0xFB &&
+                        (buf.get(p + 1).toInt() and 0xFF) == 0xFA &&
+                        (buf.get(p + 2).toInt() and 0xFF) == 0xFC &&
+                        (buf.get(p + 3).toInt() and 0xFF) == 0xFF) {
                         markerFound = true
                         break
                     }
