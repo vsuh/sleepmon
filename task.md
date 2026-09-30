@@ -688,3 +688,19 @@ SyncWorker SyncHelper XiaomiBandClassic SleepMonitor
 ## 38. Android v64 — единый build tag
 
 AppVersion повышен с v63 до **v64 (30.09.2026)**, чтобы новый APK однозначно отличался в Logcat. APK в рабочем контейнере не собирался; сборка остаётся локальной на стороне пользователя.
+
+
+## 39. Android v65 — исправление endianness sleep packet
+
+E2E v64 показал, что sleep-файл приходит полностью, но parser возвращает `pulse_sleep=0 BPM, rr=0`. Проверка формата по актуальному Gadgetbridge выявила конкретную ошибку: в stage packet заголовке Xiaomi поле `dataLen` читается **big-endian**, тогда как v64 использовал `ByteBuffer.LITTLE_ENDIAN` и `buf.short`.
+
+В v65 исправлено только чтение `dataLen`:
+- два байта длины теперь собираются как `(high << 8) | low`;
+- формат остальных полей packet header не менялся;
+- обработка type=1 RR и type=16 Summary после получения корректной длины остаётся прежней.
+
+Это объясняет одновременно отсутствие RR и то, что duration в v64 фактически брался из fallback по `wakeup - bedtime`, а `wakeCount` оставался 0.
+
+Источник формата: актуальный `Gadgetbridge SleepDetailsParser`, где `dataLen` разбирается как big-endian, а type=1 действительно содержит RR-дельты в единицах 10 мс. citeturn10view0
+
+Следующий E2E-тест должен показать ненулевой `rr` и `pulse_sleep`; APK локально не собирался.
