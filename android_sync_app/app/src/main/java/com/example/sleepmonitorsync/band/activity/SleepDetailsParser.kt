@@ -28,6 +28,7 @@ object SleepDetailsParser {
         val stagePacketCount: Int = 0,
         val type10HrCount: Int = 0,
         val type10HrAverage: Int = 0,
+        val type10CandidateStats: String = "",
         val packetTrace: String = "",
     )
 
@@ -90,6 +91,7 @@ object SleepDetailsParser {
             var stagePacketCount = 0
             var type10HrSum = 0
             var type10HrCount = 0
+            val type10Candidates = Array(8) { mutableListOf<Int>() }
             val packetTrace = mutableListOf<String>()
             val packetTypeCounts = linkedMapOf<Int, Int>()
             val packetPayloadTrace = mutableListOf<String>()
@@ -164,15 +166,27 @@ object SleepDetailsParser {
                         stagePacketCount++
                     }
                     type == 0x0A && dataLen % 4 == 0 -> {
-                        // Mi Band 9 Pro sleep files use type=10 records in 4-byte units.
-                        // The second little-endian u16 has a low byte in the plausible HR range;
-                        // observed payloads include 0x004B=75, 0x004F=79, 0x107B=123, etc.
-                        // The high byte behaves as a status/flags byte, so only the low byte is
-                        // used as the candidate heart-rate value.
+                        // v70 keeps the existing low-byte decoder only as a diagnostic candidate.
+                        // v69 produced 86 BPM while the independent control value is 61 BPM.
+                        // Record all eight byte/word interpretations before changing semantics.
                         for (offset in 0 until dataLen step 4) {
-                            val packedHr = (data[offset + 2].toInt() and 0xFF) or
-                                ((data[offset + 3].toInt() and 0xFF) shl 8)
-                            val hr = packedHr and 0xFF
+                            val b0 = data[offset].toInt() and 0xFF
+                            val b1 = data[offset + 1].toInt() and 0xFF
+                            val b2 = data[offset + 2].toInt() and 0xFF
+                            val b3 = data[offset + 3].toInt() and 0xFF
+                            val candidates = intArrayOf(
+                                b0, b1, b2, b3,
+                                b0 or (b1 shl 8),
+                                b2 or (b3 shl 8),
+                                (b0 shl 8) or b1,
+                                (b2 shl 8) or b3,
+                            )
+                            candidates.forEachIndexed { index, value ->
+                                if (value in 30..220) type10Candidates[index].add(value)
+                            }
+
+                            // Preserve the v69 candidate as a diagnostic reference.
+                            val hr = b2
                             if (hr in 30..220) {
                                 type10HrSum += hr
                                 type10HrCount++
@@ -190,6 +204,12 @@ object SleepDetailsParser {
                 rrIntervalsMs.isNotEmpty() -> rrIntervalsMs.map { 60000.0 / it }.average().toInt()
                 else -> 0
             }
+            val candidateNames = listOf("b0", "b1", "b2", "b3", "u16le0", "u16le2", "u16be0", "u16be2")
+            val type10CandidateStats = candidateNames.mapIndexed { index, name ->
+                val values = type10Candidates[index]
+                if (values.isEmpty()) "$name:n=0"
+                else "$name:n=${values.size},avg=${values.average().toInt()},min=${values.minOrNull()},max=${values.maxOrNull()}"
+            }.joinToString(";")
             SleepSummary(
                 bedTimeSeconds = bedTime,
                 wakeupTimeSeconds = wakeupTime,
@@ -202,6 +222,7 @@ object SleepDetailsParser {
                 stagePacketCount = stagePacketCount,
                 type10HrCount = type10HrCount,
                 type10HrAverage = if (type10HrCount > 0) type10HrSum / type10HrCount else 0,
+                type10CandidateStats = type10CandidateStats,
                 packetTrace = ("types=" + packetTypeCounts.entries.joinToString(",") { entry -> entry.key.toString() + ":" + entry.value } +
                     "|payload=" + packetPayloadTrace.joinToString(";") +
                     "|trace=" + packetTrace.joinToString(";")).take(4000),
