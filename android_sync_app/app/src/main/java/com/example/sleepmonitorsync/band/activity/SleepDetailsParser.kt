@@ -29,6 +29,7 @@ object SleepDetailsParser {
         val type10HrCount: Int = 0,
         val type10HrAverage: Int = 0,
         val type10CandidateStats: String = "",
+        val type10FlagStats: String = "",
         val packetTrace: String = "",
     )
 
@@ -92,6 +93,7 @@ object SleepDetailsParser {
             var type10HrSum = 0
             var type10HrCount = 0
             val type10Candidates = Array(8) { mutableListOf<Int>() }
+            val type10FlagCandidates = linkedMapOf<Int, MutableList<Int>>()
             val packetTrace = mutableListOf<String>()
             val packetTypeCounts = linkedMapOf<Int, Int>()
             val packetPayloadTrace = mutableListOf<String>()
@@ -190,6 +192,7 @@ object SleepDetailsParser {
                             if (hr in 30..220) {
                                 type10HrSum += hr
                                 type10HrCount++
+                                type10FlagCandidates.getOrPut(b3) { mutableListOf() }.add(hr)
                             }
                         }
                     }
@@ -210,6 +213,11 @@ object SleepDetailsParser {
                 if (values.isEmpty()) "$name:n=0"
                 else "$name:n=${values.size},avg=${values.average().toInt()},min=${values.minOrNull()},max=${values.maxOrNull()}"
             }.joinToString(";")
+            val type10FlagStats = type10FlagCandidates.entries.joinToString(";") { (flag, values) ->
+                "b3=%02X:n=%d,avg=%d,min=%d,max=%d".format(
+                    flag, values.size, values.average().toInt(), values.minOrNull()!!, values.maxOrNull()!!
+                )
+            }
             SleepSummary(
                 bedTimeSeconds = bedTime,
                 wakeupTimeSeconds = wakeupTime,
@@ -223,6 +231,7 @@ object SleepDetailsParser {
                 type10HrCount = type10HrCount,
                 type10HrAverage = if (type10HrCount > 0) type10HrSum / type10HrCount else 0,
                 type10CandidateStats = type10CandidateStats,
+                type10FlagStats = type10FlagStats,
                 packetTrace = ("types=" + packetTypeCounts.entries.joinToString(",") { entry -> entry.key.toString() + ":" + entry.value } +
                     "|payload=" + packetPayloadTrace.joinToString(";") +
                     "|trace=" + packetTrace.joinToString(";")).take(4000),
