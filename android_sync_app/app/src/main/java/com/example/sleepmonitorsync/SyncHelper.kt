@@ -182,7 +182,9 @@ object SyncHelper {
             // Sleep summaries are keyed by wake-up date, so the sleep interval may
             // start on the previous calendar day. Use all decoded minute samples,
             // not only daySamples, to include the pre-midnight part of the night.
-            val sleepPulse = if (sleep != null) {
+            // Prefer the sleep file's RR-derived pulse. Fall back to minute activity HR
+            // only for old or partial sleep files without RR packets.
+            val sleepPulse = sleep?.pulseAvgSleep?.takeIf { it > 0 } ?: if (sleep != null) {
                 val sleepStart = sleep.bedTimeSeconds.toLong()
                 val wakeTime = sleep.wakeupTimeSeconds.toLong()
                 unique.asSequence()
