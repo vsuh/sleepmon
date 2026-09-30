@@ -678,3 +678,8 @@ SyncWorker SyncHelper XiaomiBandClassic SleepMonitor
 После parser-изменения агрегатор переключён на SleepSummary.pulseAvgSleep как основной источник pulse_avg_sleep. Старый расчёт по минутным activity HR сохранён только как fallback, если sleep-файл не содержит пригодных RR-интервалов.
 
 Это устраняет подтверждённое расхождение v63, где sleep pulse считался по coarse minute samples и дал 60 BPM.
+
+
+## 37. Android v64 — Logcat диагностика sleep RR
+
+Лог получения sleep-файла теперь дополнительно выводит `pulse_sleep` и количество распознанных RR-интервалов. Это позволит в следующем E2E напрямую увидеть, что pulse извлечён именно из sleep packet type=1, а не из минутной activity статистики.
