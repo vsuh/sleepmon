@@ -103,7 +103,9 @@ object SleepDetailsParser {
                 buf.long // timestamp
                 buf.get() // parity
                 val type = buf.get().toInt() and 0xFF
-                val dataLen = buf.short.toInt() and 0xFFFF
+                // Xiaomi sleep packet dataLen is big-endian (unlike the surrounding packet fields).
+                val dataLen = ((buf.get().toInt() and 0xFF) shl 8) or
+                    (buf.get().toInt() and 0xFF)
 
                 // These packet types carry no data bytes despite the nominal length fields.
                 if (type == 0x2 || type == 0x3 || type == 0x9 || type == 0xc ||
