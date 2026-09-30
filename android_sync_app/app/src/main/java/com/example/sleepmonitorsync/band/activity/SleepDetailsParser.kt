@@ -21,6 +21,8 @@ object SleepDetailsParser {
         val wakeupTimeSeconds: Int,
         val sleepDurationMinutes: Int,
         val wakeCount: Int,
+        val pulseAvgSleep: Int = 0,
+        val rrIntervalCount: Int = 0,
     )
 
     fun parse(fileId: XiaomiActivityFileId, fileBytes: ByteArray): SleepSummary? {
@@ -77,6 +79,7 @@ object SleepDetailsParser {
 
             var wakeCount = 0
             var sleepDurationMinutes = 0
+            val rrIntervalsMs = mutableListOf<Int>()
 
             // Sleep stage packets are preceded by the fixed FF FC FA FB marker.
             while (buf.remaining() >= 17) {
@@ -109,25 +112,43 @@ object SleepDetailsParser {
                 }
 
                 if (dataLen > buf.remaining()) break
-                if (type == 0x10 && dataLen >= 13) {
-                    val data = ByteArray(dataLen)
-                    buf.get(data)
-                    wakeCount = data[0].toInt() and 0x0F
-                    sleepDurationMinutes = (data[1].toInt() and 0xFF) or
-                        ((data[2].toInt() and 0xFF) shl 8)
-                } else {
-                    buf.position(buf.position() + dataLen)
+                val data = ByteArray(dataLen)
+                buf.get(data)
+
+                when {
+                    type == 1 -> {
+                        // Xiaomi Band sleep pulse is stored as RR intervals in 10 ms units.
+                        for (rawDelta in data) {
+                            val intervalMs = (rawDelta.toInt() and 0xFF) * 10
+                            if (intervalMs in 300..2000) {
+                                rrIntervalsMs.add(intervalMs)
+                            }
+                        }
+                    }
+                    type == 0x10 && dataLen >= 13 -> {
+                        // Summary: low nibble of byte 0 is wake_count; bytes 1..2 are sleep duration.
+                        wakeCount = data[0].toInt() and 0x0F
+                        sleepDurationMinutes = (data[1].toInt() and 0xFF) or
+                            ((data[2].toInt() and 0xFF) shl 8)
+                    }
                 }
             }
 
             if (sleepDurationMinutes == 0 && wakeupTime > bedTime) {
                 sleepDurationMinutes = (wakeupTime - bedTime) / 60
             }
+            val pulseAvgSleep = if (rrIntervalsMs.isNotEmpty()) {
+                rrIntervalsMs.map { 60000.0 / it }.average().toInt()
+            } else {
+                0
+            }
             SleepSummary(
                 bedTimeSeconds = bedTime,
                 wakeupTimeSeconds = wakeupTime,
                 sleepDurationMinutes = sleepDurationMinutes,
                 wakeCount = wakeCount,
+                pulseAvgSleep = pulseAvgSleep,
+                rrIntervalCount = rrIntervalsMs.size,
             )
         } catch (_: BufferUnderflowException) {
             null
