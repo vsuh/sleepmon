@@ -890,3 +890,18 @@ E2E v72 дал контрольную точку для сегодняшнего
 `AppVersion.NUMBER` повышен с v72 до **v73 (01.10.2026)**, чтобы APK с новой семантикой `pulseAvgSleep` однозначно отличался в Logcat.
 
 Перед E2E требуется собрать и установить именно v73. В тесте ожидается новая строка `Sleep pulse source=daily_hr` и итоговый `Parsed Xiaomi sleep` с `pulse_sleep`, полученным из daily HR при наличии samples.
+
+## 59. Android v74 — диагностика ACTIVITY_MANUAL_SAMPLES
+
+E2E v73 показал, что для сна 30.09 внутри `perMinuteSamples` находится только один HR sample (59 BPM), поэтому daily HR не подтверждает контрольные 61 BPM.
+
+При разборе activity-файлов обнаружено, что три ранее помечавшихся как unsupported файла имеют `type=0/subtype=6/detail=0/version=2` и размеры 30/42/72 байта. В актуальном Gadgetbridge этот subtype называется `ACTIVITY_MANUAL_SAMPLES` и содержит timestamped измерения HR/SpO2/stress и других health-параметров; формат v2 начинается сразу с sample-записей после 7-byte fileId и padding. citeturn7view0turn5view0
+
+В v74 добавлена **только диагностика**, без изменения `pulseAvgSleep` и без ACK этих файлов:
+- для `ACTIVITY_MANUAL_SAMPLES` version 2 приложение декодирует timestamp/type/value у простых однобайтовых записей;
+- типы `0x10..0x13` логируются вместе с timestamp и значением;
+- при неизвестном типе разбор этой диагностической последовательности прекращается, чтобы не угадывать размер записи;
+- результат выводится как `Manual samples: ... records=...`;
+- сами файлы по-прежнему считаются unsupported и не участвуют в расчёте sleep pulse.
+
+Цель следующего E2E — проверить, содержат ли эти manual samples ночные HR-точки и есть ли среди них значение/ряд, соответствующий контрольным **61 BPM**. APK в рабочем контейнере не собирался.
