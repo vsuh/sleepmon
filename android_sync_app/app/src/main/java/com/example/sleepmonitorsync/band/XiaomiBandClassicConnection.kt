@@ -555,6 +555,7 @@ class XiaomiBandClassicConnection(
                     if (timedOut == null) break // no activity for FETCH_IDLE_TIMEOUT_MS - assume done
                 }
             }
+            logDailyHeartRateDuringSleep()
             Result.success(currentResult())
         } catch (e: TimeoutCancellationException) {
             Result.success(currentResult())
@@ -563,6 +564,28 @@ class XiaomiBandClassicConnection(
         }
     }
 
+    /**
+     * Diagnostic only: compare minute-level HR samples from ACTIVITY_DAILY/DETAILS
+     * with each parsed sleep interval. This does not affect pulseAvgSleep.
+     */
+    private fun logDailyHeartRateDuringSleep() {
+        if (perMinuteSamples.isEmpty() || sleepSummaries.isEmpty()) return
+
+        sleepSummaries.forEach { sleep ->
+            val hr = perMinuteSamples.asSequence()
+                .filter { it.timestampSeconds in sleep.bedTimeSeconds..sleep.wakeupTimeSeconds }
+                .mapNotNull { it.heartRate }
+                .filter { it in 30..220 }
+                .toList()
+            if (hr.isEmpty()) {
+                VersionedLog.i(TAG, "Sleep HR cross-check: bed=" + sleep.bedTimeSeconds + ", wake=" + sleep.wakeupTimeSeconds + ", daily_hr_count=0")
+            } else {
+                VersionedLog.i(TAG, "Sleep HR cross-check: bed=" + sleep.bedTimeSeconds + ", wake=" + sleep.wakeupTimeSeconds +
+                    ", daily_hr_count=" + hr.size + ", daily_hr_avg=" + hr.average().toInt() +
+                    ", min=" + hr.minOrNull() + ", max=" + hr.maxOrNull())
+            }
+        }
+    }
     private fun currentResult() = FetchResult(
         perMinuteSamples.toList(), dailySummaries.toList(), sleepSummaries.toList(),
         filesReceived, filesFailed, filesUnsupported, unsupportedFileDescriptions.toList(),
@@ -898,36 +921,3 @@ class XiaomiBandClassicConnection(
         val material = authMaterial ?: return false
         val plain = command.toByteArray()
         val cipherBytes = XiaomiCrypto.ctrCryptV2(material.encryptionKey, plain)
-        val dataPayload = ByteArray(2 + cipherBytes.size)
-        dataPayload[0] = XiaomiSppFrameV2.CHANNEL_PROTOBUF.toByte()
-        dataPayload[1] = XiaomiSppFrameV2.OPCODE_SEND_ENCRYPTED.toByte()
-        cipherBytes.copyInto(dataPayload, 2)
-        val frame = XiaomiSppFrameV2.encode(
-            packetType = XiaomiSppFrameV2.PACKET_TYPE_DATA,
-            sequenceNumber = outgoingSeq++,
-            payload = dataPayload,
-        )
-        return writeRaw(sock, frame)
-    }
-
-    private fun sendAck(sock: BluetoothSocket, sequenceNumberToAck: Int) {
-        val frame = XiaomiSppFrameV2.encode(
-            packetType = XiaomiSppFrameV2.PACKET_TYPE_ACK,
-            sequenceNumber = sequenceNumberToAck,
-            payload = ByteArray(0),
-        )
-        writeRaw(sock, frame)
-    }
-
-    private fun writeRaw(sock: BluetoothSocket, bytes: ByteArray): Boolean {
-        return try {
-            val out: OutputStream = sock.outputStream
-            out.write(bytes)
-            out.flush()
-            true
-        } catch (e: IOException) {
-            VersionedLog.e(TAG, "SPP write failed: ${e.message}", e)
-            false
-        }
-    }
-}
