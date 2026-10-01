@@ -555,12 +555,40 @@ class XiaomiBandClassicConnection(
                     if (timedOut == null) break // no activity for FETCH_IDLE_TIMEOUT_MS - assume done
                 }
             }
+            applyDailyHeartRateToSleepPulse()
             logDailyHeartRateDuringSleep()
             Result.success(currentResult())
         } catch (e: TimeoutCancellationException) {
             Result.success(currentResult())
         } finally {
             fetchActive = false
+        }
+    }
+
+    /**
+     * Uses minute-level daily HR as the primary sleep-pulse source when samples overlap
+     * the sleep interval. SleepDetailsParser's type=10 and RR values remain available
+     * as diagnostics/fallback for intervals without daily HR samples.
+     */
+    private fun applyDailyHeartRateToSleepPulse() {
+        if (sleepSummaries.isEmpty()) return
+
+        for (index in sleepSummaries.indices) {
+            val sleep = sleepSummaries[index]
+            val hr = perMinuteSamples.asSequence()
+                .filter { it.timestampSeconds in sleep.bedTimeSeconds..sleep.wakeupTimeSeconds }
+                .mapNotNull { it.heartRate }
+                .filter { it in 30..220 }
+                .toList()
+            if (hr.isNotEmpty()) {
+                val average = hr.average().toInt()
+                sleepSummaries[index] = sleep.copy(pulseAvgSleep = average)
+                VersionedLog.i(
+                    TAG,
+                    "Sleep pulse source=daily_hr: bed=${sleep.bedTimeSeconds}, wake=${sleep.wakeupTimeSeconds}, " +
+                        "count=${hr.size}, avg=$average, previous=${sleep.pulseAvgSleep}"
+                )
+            }
         }
     }
 
