@@ -883,3 +883,10 @@ E2E v72 дал контрольную точку для сегодняшнего
 - добавлен Logcat `Sleep pulse source=daily_hr: ... previous=...`, чтобы видеть новый источник и старое значение рядом.
 
 Это первое фактическое переключение семантики `pulseAvgSleep` после v69–v72; APK локально не собирался.
+
+
+## 58. Android v73 — build tag
+
+`AppVersion.NUMBER` повышен с v72 до **v73 (01.10.2026)**, чтобы APK с новой семантикой `pulseAvgSleep` однозначно отличался в Logcat.
+
+Перед E2E требуется собрать и установить именно v73. В тесте ожидается новая строка `Sleep pulse source=daily_hr` и итоговый `Parsed Xiaomi sleep` с `pulse_sleep`, полученным из daily HR при наличии samples.
