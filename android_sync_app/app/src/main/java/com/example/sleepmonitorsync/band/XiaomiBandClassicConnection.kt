@@ -593,6 +593,42 @@ class XiaomiBandClassicConnection(
     }
 
     /** Diagnostic only: compare minute-level daily HR samples with each sleep interval. */
+    /** Diagnostic only: decode Xiaomi ACTIVITY_MANUAL_SAMPLES records without using them for pulse aggregation. */
+    private fun logManualSamplesDiagnostics(fileId: XiaomiActivityFileId, data: ByteArray) {
+        if (fileId.version != 2 || data.size < 13) {
+            VersionedLog.i(TAG, "Manual samples: file=${fileId.raw.joinToString("") { "%02x".format(it) }}, version=${fileId.version}, size=${data.size}, unsupported_version")
+            return
+        }
+
+        val records = mutableListOf<String>()
+        var pos = 8 // 7-byte fileId + one padding byte
+        val bodyEnd = data.size - 4
+        while (pos + 5 <= bodyEnd) {
+            val timestamp = (data[pos].toInt() and 0xFF) or
+                ((data[pos + 1].toInt() and 0xFF) shl 8) or
+                ((data[pos + 2].toInt() and 0xFF) shl 16) or
+                ((data[pos + 3].toInt() and 0xFF) shl 24)
+            val type = data[pos + 4].toInt() and 0xFF
+            pos += 5
+            if (type == 0x10 || type == 0x11 || type == 0x12 || type == 0x13) {
+                if (pos >= bodyEnd) break
+                val value = data[pos].toInt() and 0xFF
+                pos += 1
+                records += "ts=$timestamp,type=0x${"%02X".format(type)},value=$value"
+            } else {
+                records += "ts=$timestamp,type=0x${"%02X".format(type)},unknown"
+                break
+            }
+        }
+
+        VersionedLog.i(
+            TAG,
+            "Manual samples: file=${fileId.raw.joinToString("") { "%02x".format(it) }}, " +
+                "version=${fileId.version}, size=${data.size}, records=${records.size}, " +
+                records.joinToString(";")
+        )
+    }
+
     private fun logDailyHeartRateDuringSleep() {
         if (perMinuteSamples.isEmpty() || sleepSummaries.isEmpty()) return
         sleepSummaries.forEach { sleep ->
@@ -803,6 +839,10 @@ class XiaomiBandClassicConnection(
             val isKnownCombo = isDailyCombo || isSleepCombo
 
             if (!isKnownCombo) {
+                if (fileId.type == XiaomiActivityFileId.TYPE_ACTIVITY &&
+                    fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_MANUAL_SAMPLES) {
+                    logManualSamplesDiagnostics(fileId, data)
+                }
                 filesUnsupported++
                 unsupportedFileDescriptions.add("type=${fileId.type}/subtype=${fileId.subtype}/detail=${fileId.detailType}/v${fileId.version} (${data.size}б)")
             } else {
