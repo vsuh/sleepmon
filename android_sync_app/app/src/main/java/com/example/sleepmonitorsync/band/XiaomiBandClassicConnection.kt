@@ -555,6 +555,7 @@ class XiaomiBandClassicConnection(
                     if (timedOut == null) break // no activity for FETCH_IDLE_TIMEOUT_MS - assume done
                 }
             }
+            logDailyHeartRateDuringSleep()
             Result.success(currentResult())
         } catch (e: TimeoutCancellationException) {
             Result.success(currentResult())
@@ -563,6 +564,24 @@ class XiaomiBandClassicConnection(
         }
     }
 
+    /** Diagnostic only: compare minute-level daily HR samples with each sleep interval. */
+    private fun logDailyHeartRateDuringSleep() {
+        if (perMinuteSamples.isEmpty() || sleepSummaries.isEmpty()) return
+        sleepSummaries.forEach { sleep ->
+            val hr = perMinuteSamples.asSequence()
+                .filter { it.timestampSeconds in sleep.bedTimeSeconds..sleep.wakeupTimeSeconds }
+                .mapNotNull { it.heartRate }
+                .filter { it in 30..220 }
+                .toList()
+            if (hr.isEmpty()) {
+                VersionedLog.i(TAG, "Sleep HR cross-check: bed=" + sleep.bedTimeSeconds + ", wake=" + sleep.wakeupTimeSeconds + ", daily_hr_count=0")
+            } else {
+                VersionedLog.i(TAG, "Sleep HR cross-check: bed=" + sleep.bedTimeSeconds + ", wake=" + sleep.wakeupTimeSeconds +
+                    ", daily_hr_count=" + hr.size + ", daily_hr_avg=" + hr.average().toInt() +
+                    ", min=" + hr.minOrNull() + ", max=" + hr.maxOrNull())
+            }
+        }
+    }
     private fun currentResult() = FetchResult(
         perMinuteSamples.toList(), dailySummaries.toList(), sleepSummaries.toList(),
         filesReceived, filesFailed, filesUnsupported, unsupportedFileDescriptions.toList(),
