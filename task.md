@@ -868,3 +868,18 @@ APK локально не собирался.
 Изменение: после завершения `fetchActivityData()` вызывается `logDailyHeartRateDuringSleep()`, который для каждого `SleepSummary` считает минутные `heartRate` из `perMinuteSamples` только внутри `bedTime..wakeupTime` и пишет `daily_hr_count`, `daily_hr_avg`, `min`, `max`.
 
 `pulseAvgSleep` не изменён. Это диагностический источник, а не новая формула.
+
+
+## 57. Android v73 — daily HR стал источником pulseAvgSleep
+
+E2E v72 дал контрольную точку для сегодняшнего сна: daily HR внутри интервала 1790803920..1790830620 содержит **36** валидных samples со средним **66 BPM** (min=62, max=76), что близко к внешнему контрольному значению **67 BPM**. Для вчерашнего интервала найден только один sample (59 BPM), поэтому он не используется как подтверждение вчерашних 61 BPM.
+
+В `XiaomiBandClassicConnection.fetchActivityData()` после получения всех файлов добавлен `applyDailyHeartRateToSleepPulse()`:
+- для каждого `SleepSummary` берутся minute-level `heartRate` из `perMinuteSamples` только внутри `bedTime..wakeupTime`;
+- невалидные значения вне диапазона 30…220 BPM отбрасываются;
+- при наличии samples `pulseAvgSleep` заменяется на целочисленное среднее daily HR;
+- при отсутствии samples старое значение `SleepDetailsParser` сохраняется без изменений;
+- type=10 и RR остаются доступными как диагностические/резервные данные, их parser не изменён;
+- добавлен Logcat `Sleep pulse source=daily_hr: ... previous=...`, чтобы видеть новый источник и старое значение рядом.
+
+Это первое фактическое переключение семантики `pulseAvgSleep` после v69–v72; APK локально не собирался.
