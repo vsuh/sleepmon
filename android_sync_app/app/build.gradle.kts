@@ -1,3 +1,4 @@
+import com.android.build.api.artifact.SingleArtifact
 import java.io.File
 import java.io.FileInputStream
 import java.util.Properties
@@ -73,12 +74,20 @@ android {
     }
 }
 
+// AGP 9 removed VariantOutput.outputFileName from the public variant API, so the release APK
+// is renamed by a Copy task fed from the official APK artifact (configuration-cache safe).
+// Result: app/build/outputs/sleepmon/sleepmon.apk (the original app-release*.apk stays in
+// app/build/outputs/apk/release/).
 androidComponents {
-    onVariants { variant ->
-        variant.outputs.forEach { output ->
-            if (variant.name == "release") {
-                output.outputFileName.set("sleepmon.apk")
-            }
+    onVariants(selector().withBuildType("release")) { variant ->
+        val copyApk = tasks.register<Copy>("copySleepmonApk") {
+            from(variant.artifacts.get(SingleArtifact.APK))
+            include("*.apk")
+            rename { "sleepmon.apk" }
+            into(layout.buildDirectory.dir("outputs/sleepmon"))
+        }
+        tasks.matching { it.name == "assembleRelease" }.configureEach {
+            finalizedBy(copyApk)
         }
     }
 }
