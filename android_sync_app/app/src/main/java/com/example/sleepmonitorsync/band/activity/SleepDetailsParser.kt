@@ -31,6 +31,11 @@ object SleepDetailsParser {
         val type10CandidateStats: String = "",
         val type10FlagStats: String = "",
         val packetTrace: String = "",
+        // v75: HR array stored in the sleep-file header block (header bit 5, v4: bit 4).
+        val hrBlockCount: Int = 0,
+        val hrBlockValidCount: Int = 0,
+        val hrBlockAverage: Int = 0,
+        val hrBlockStats: String = "",
     )
 
     fun parse(fileId: XiaomiActivityFileId, fileBytes: ByteArray): SleepSummary? {
@@ -79,7 +84,26 @@ object SleepDetailsParser {
         }
 
         return try {
-            skipTimedByteSamples(5 - versionDependentFields, 1)
+            // v75: the first optional block is the sleep heart-rate array:
+            //   [unit: u16 seconds][count: u16][firstRecordTime: u32 (v2+)][count x u8 bpm]
+            // Gadgetbridge skips it; we read it. 0 / 255 mean "no measurement".
+            var hrUnit = 0
+            var hrFirstTime = 0
+            var hrRaw = ByteArray(0)
+            val hrBit = 5 - versionDependentFields
+            if (hrBit in 0..7 && (header and (1 shl hrBit)) != 0) {
+                if (buf.remaining() < 4) throw IllegalArgumentException("short sleep HR header")
+                hrUnit = buf.short.toInt() and 0xFFFF
+                val hrCount = buf.short.toInt() and 0xFFFF
+                if (hrCount > 0) {
+                    if (fileId.version >= 2) {
+                        if (buf.remaining() < 4) throw IllegalArgumentException("short sleep HR timestamp")
+                        hrFirstTime = buf.int
+                    }
+                    if (hrCount > buf.remaining()) throw IllegalArgumentException("short sleep HR payload")
+                    hrRaw = ByteArray(hrCount).also { buf.get(it) }
+                }
+            }
             skipTimedByteSamples(4 - versionDependentFields, 1)
             if (fileId.version >= 3) {
                 skipTimedByteSamples(3 - versionDependentFields, 4)
@@ -202,8 +226,19 @@ object SleepDetailsParser {
             if (sleepDurationMinutes == 0 && wakeupTime > bedTime) {
                 sleepDurationMinutes = (wakeupTime - bedTime) / 60
             }
+            // Only samples inside bed..wake count: the array runs past wake-up (about an hour of
+            // waking HR, 73-88 BPM, in the v75 capture, which pulled the average from 63 to 65).
+            val hrValid = hrRaw.indices.filter { i ->
+                val t = hrFirstTime.toLong() + i.toLong() * hrUnit
+                hrUnit == 0 || hrFirstTime == 0 || t in bedTime.toLong()..wakeupTime.toLong()
+            }.map { hrRaw[it].toInt() and 0xFF }.filter { it in 30..220 }
+            val hrBlockAvg = if (hrValid.isNotEmpty()) hrValid.average().toInt() else 0
+            val hrBlockStats = "unit=$hrUnit,first=$hrFirstTime,count=${hrRaw.size},valid=${hrValid.size}" +
+                (if (hrValid.isNotEmpty()) ",avg=$hrBlockAvg,min=${hrValid.min()},max=${hrValid.max()}" else "") +
+                ",head=" + hrRaw.take(32).joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+            // type=10 is NOT used any more: v69-v71 showed it gives 86 BPM vs the 61 BPM control value.
             val pulseAvgSleep = when {
-                type10HrCount > 0 -> type10HrSum / type10HrCount
+                hrValid.isNotEmpty() -> hrBlockAvg
                 rrIntervalsMs.isNotEmpty() -> rrIntervalsMs.map { 60000.0 / it }.average().toInt()
                 else -> 0
             }
@@ -232,6 +267,10 @@ object SleepDetailsParser {
                 type10HrAverage = if (type10HrCount > 0) type10HrSum / type10HrCount else 0,
                 type10CandidateStats = type10CandidateStats,
                 type10FlagStats = type10FlagStats,
+                hrBlockCount = hrRaw.size,
+                hrBlockValidCount = hrValid.size,
+                hrBlockAverage = hrBlockAvg,
+                hrBlockStats = hrBlockStats,
                 packetTrace = ("types=" + packetTypeCounts.entries.joinToString(",") { entry -> entry.key.toString() + ":" + entry.value } +
                     "|payload=" + packetPayloadTrace.joinToString(";") +
                     "|trace=" + packetTrace.joinToString(";")).take(4000),

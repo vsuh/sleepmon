@@ -130,6 +130,9 @@ class XiaomiBandClassicConnection(
         /** Overall cap on a single fetchActivityData() call. */
         private const val FETCH_OVERALL_TIMEOUT_MS = 60_000L
 
+        /** Minimum minute-level HR samples inside a sleep interval to trust them over the sleep file's own HR block. */
+        private const val MIN_DAILY_HR_SAMPLES = 20
+
         // The Mi Band supports only one Classic SPP session reliably. Serialize every
         // operation in this process, including manual debug actions, so a second socket
         // cannot invalidate the first connection while it is uploading/ACKing files.
@@ -580,7 +583,7 @@ class XiaomiBandClassicConnection(
                 .mapNotNull { it.heartRate }
                 .filter { it in 30..220 }
                 .toList()
-            if (hr.isNotEmpty()) {
+            if (sleep.hrBlockValidCount == 0 && hr.size >= MIN_DAILY_HR_SAMPLES) {
                 val average = hr.average().toInt()
                 sleepSummaries[index] = sleep.copy(pulseAvgSleep = average)
                 VersionedLog.i(
@@ -829,6 +832,7 @@ class XiaomiBandClassicConnection(
                 TAG,
                 "Received file $fileId (${data.size} bytes), rawFileId=${data.copyOfRange(0, 7).joinToString("") { "%02x".format(it) }}"
             )
+            dumpRawFile(fileId, data)
 
             val isDailyCombo = fileId.type == XiaomiActivityFileId.TYPE_ACTIVITY &&
                 fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_DAILY &&
@@ -869,7 +873,7 @@ class XiaomiBandClassicConnection(
                                     "stage_packets=${sleep.stagePacketCount}, " +
                                     "type10_hr_count=${sleep.type10HrCount}, type10_hr_avg=${sleep.type10HrAverage}, " +
                                     "type10_candidates=${sleep.type10CandidateStats}, type10_flags=${sleep.type10FlagStats}, " +
-                                    "trace=${sleep.packetTrace}"
+                                    "hr_block={${sleep.hrBlockStats}}, trace=${sleep.packetTrace}"
                             )
                             true
                         } else {
@@ -892,6 +896,32 @@ class XiaomiBandClassicConnection(
             }
         } finally {
             requestNextActivityFile(sock)
+        }
+    }
+
+    /**
+     * v75: keeps a verbatim copy of every sleep / manual-samples file BEFORE it is ACKed
+     * (the band deletes ACKed files, so this is the only chance to analyse them offline),
+     * and prints it to Logcat as base64 lines: `RAWFILE <name> part i/n <base64>`.
+     * Decode: join the parts in order and base64-decode.
+     */
+    private fun dumpRawFile(fileId: XiaomiActivityFileId, data: ByteArray) {
+        val interesting = fileId.type == XiaomiActivityFileId.TYPE_ACTIVITY &&
+            (fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_SLEEP ||
+                fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_SLEEP_STAGES ||
+                fileId.subtype == XiaomiActivityFileId.SUBTYPE_ACTIVITY_MANUAL_SAMPLES)
+        if (!interesting) return
+        val name = "s${fileId.subtype}_d${fileId.detailType}_v${fileId.version}_${fileId.timestamp}"
+        try {
+            val dir = java.io.File(context.filesDir, "raw_band_files").apply { mkdirs() }
+            java.io.File(dir, "$name.bin").writeBytes(data)
+        } catch (e: Exception) {
+            VersionedLog.w(TAG, "Raw file save failed for $name: ${e.message}")
+        }
+        val b64 = android.util.Base64.encodeToString(data, android.util.Base64.NO_WRAP)
+        val parts = b64.chunked(3000)
+        parts.forEachIndexed { i, part ->
+            VersionedLog.i(TAG, "RAWFILE $name part ${i + 1}/${parts.size} $part")
         }
     }
 
