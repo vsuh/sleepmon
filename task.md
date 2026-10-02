@@ -10,7 +10,7 @@ Sleep Monitor получает данные Xiaomi Smart Band по Bluetooth Cla
 
 ## Текущий код
 
-Последние code/build commits: 2279e1362dc91d5385f3f1815c7597cf13b8624d (v81), 04adff5573431479cc87a16771128980c24ab243 (local release signing), 92d76d55cfc95321fc482dddc8f1ae384ce1c000 (signing secrets ignored).
+Последние code/build commits: cc5ad10946d6f9938b0ee1ca0d87b87a63e3ac37 (external release signing secrets), 2279e1362dc91d5385f3f1815c7597cf13b8624d (v81), 04adff5573431479cc87a16771128980c24ab243 (local release signing), 92d76d55cfc95321fc482dddc8f1ae384ce1c000 (signing secrets ignored).
 
 Android:
 - build tag v81 (02.10.2026);
@@ -74,15 +74,18 @@ GitHub Actions и GitHub Releases отсутствуют, поэтому авт�
 Стоп-факторы:
 - нет финального E2E v81 после изменений Logcat/signing;
 - release build имеет isMinifyEnabled = false;
-- release signing настроен через локальный `keystore.properties`, секреты не хранятся в Git; `keystore.properties`, `*.jks`, `*.keystore` игнорируются;
+- release signing настроен через внешний локальный `../../../_secrets/sleepmon-apk/keystore.properties`; keystore и файл с паролями не хранятся в Git; `keystore.properties`, `*.jks`, `*.keystore` игнорируются;
+- Gradle теперь разрешает относительный `storeFile` относительно каталога внешнего `keystore.properties`;
 - README содержит пошаговую инструкцию создания keystore и `assembleRelease`.
 - `versionCode=81`, `versionName=81`, build tag живёт в AppVersion.
 
 Перед production APK:
-1. собрать release APK локально;
-2. установить и провести полный E2E;
-3. проверить очередь, server failover и ACK;
-4. убедиться, что Logcat не содержит health payload.
+1. проверить `gradlew.bat signingReport`: release должен показывать Config/Store/Alias, а не `null`;
+2. собрать release APK локально;
+3. проверить подпись APK через `apksigner` из Android SDK Build Tools либо, как минимум, сертификат v1 через `keytool`;
+4. установить и провести полный E2E;
+5. проверить очередь, server failover и ACK;
+6. убедиться, что Logcat не содержит health payload.
 
 ### FastAPI app
 
@@ -113,5 +116,5 @@ Backend архитектурно готов к production deployment, но те�
 1. E2E v80: сервер недоступен → очередь → восстановление → повтор → ACK → очистка очереди.
 2. Проверить несколько последовательных дней и pulse_avg_day/pulse_avg_sleep.
 3. Обновить production HELOR до проверенного commit.
-4. Создать локальный release keystore/properties, собрать подписанный release APK и провести финальный E2E.
+4. Проверить release signing через внешний `_secrets/sleepmon-apk`, собрать подписанный release APK и провести финальный E2E.
 5. После успешного E2E считать конфигурацию готовой к эксплуатации.
