@@ -77,6 +77,8 @@ def parse_note(content: str | None) -> dict:
         "sleep_hours": 0,
         "steps_total": 0,
         "sleep_awakenings": 0,
+        "pulse_avg_sleep": 0,
+        "pulse_avg_day": 0,
     }
     if content and content.startswith("---"):
         parts = content.split("---", 2)
@@ -89,6 +91,8 @@ def parse_note(content: str | None) -> dict:
             result["sleep_hours"] = frontmatter.get("sleep_hours", 0)
             result["steps_total"] = frontmatter.get("steps_total", frontmatter.get("steps_1", 0) + frontmatter.get("steps_2", 0))
             result["sleep_awakenings"] = frontmatter.get("sleep_awakenings", 0)
+            result["pulse_avg_sleep"] = frontmatter.get("pulse_avg_sleep", 0)
+            result["pulse_avg_day"] = frontmatter.get("pulse_avg_day", 0)
     return result
 
 
@@ -278,14 +282,15 @@ async def sync_endpoint(request: Request,
 
     - `alco` and free-text `notes` are NEVER touched here (user-owned).
     - `well_being` and `sleep_quality` are preserved: both are subjective user-owned fields and are never changed by automatic sync.
-    - `sleep_hours` is "fill-once": only written when the existing value is 0,
-      and only with a non-zero incoming value. Once a real value is recorded,
-      sync will never overwrite it again (can't "re-measure" sleep mid-day).
-      `sleep_awakenings` shares this fill-once gate with `sleep_hours` — it is
-      the count of distinct awakenings inside the sleep period.
+    - Sleep fields (`sleep_hours`, `sleep_awakenings`, `pulse_avg_sleep`) are
+      replaced as a group only when the incoming night is LONGER than the stored
+      one (the band re-sends an in-progress night with growing duration). Equal
+      or shorter nights never replace; with equal duration only empty fields are
+      filled. `sleep_awakenings` is the count of distinct awakenings in the night.
     - `steps_total` is ALWAYS updated — it accumulates throughout the day and is the only stored step counter.
-    - `pulse_avg_day` / `pulse_avg_sleep` are NOT fill-once: they reflect
-      naturally fluctuating readings and are always updated on every sync.
+    - `pulse_avg_day` is updated when the incoming value is > 0 (0 = no waking
+      samples yet, keep the stored one); `pulse_avg_sleep` follows the sleep
+      rules above.
     - `related` is recomputed from the note's own date every time (cheap,
       deterministic, and self-healing if it was ever wrong).
 
@@ -322,18 +327,35 @@ async def sync_endpoint(request: Request,
 
     existing = parse_note(content)
 
-    # sleep_hours and awakening count share one fill-once gate:
-    # can't "remeasure" a night's sleep mid-day.
-    should_fill_sleep = not existing["sleep_hours"]
-    final_sleep_hours = round(sleep_hours, 1) if should_fill_sleep else existing["sleep_hours"]
-    final_sleep_awakenings = sleep_awakenings if should_fill_sleep else existing["sleep_awakenings"]
+    # Sleep fields (sleep_hours, sleep_awakenings, pulse_avg_sleep) describe one night.
+    # While the night is in progress the band re-sends it with growing duration
+    # (2.2 h at 01:52 ... 7.7 h at 07:58), so a LONGER night replaces a shorter one.
+    # Equal or shorter never replaces: a complete night and manual corrections stay safe.
+    incoming_sleep_hours = round(sleep_hours, 1)
+    existing_sleep_hours = existing["sleep_hours"] or 0
+    replace_sleep = incoming_sleep_hours > existing_sleep_hours
+    same_night = incoming_sleep_hours > 0 and incoming_sleep_hours == existing_sleep_hours
+
+    if replace_sleep:
+        final_sleep_hours = incoming_sleep_hours
+        final_sleep_awakenings = sleep_awakenings
+        final_pulse_avg_sleep = pulse_avg_sleep if pulse_avg_sleep > 0 else existing["pulse_avg_sleep"]
+    else:
+        final_sleep_hours = existing["sleep_hours"]
+        # Same duration: only fill what is still empty (never overwrite a recorded value).
+        final_sleep_awakenings = (
+            sleep_awakenings if same_night and not existing["sleep_awakenings"] else existing["sleep_awakenings"]
+        )
+        final_pulse_avg_sleep = (
+            pulse_avg_sleep if same_night and not existing["pulse_avg_sleep"] else existing["pulse_avg_sleep"]
+        )
 
     # steps: ALWAYS update (accumulate throughout the day)
     final_steps_total = steps_total
 
-    # Sleep pulse: do not erase a previously recorded value when a later sync
-    # has no usable night HR samples. A non-zero new measurement may update it.
-    final_pulse_avg_sleep = pulse_avg_sleep if pulse_avg_sleep > 0 else existing.get("pulse_avg_sleep", 0)
+    # Waking pulse: 0 means "no waking-hours samples yet" (e.g. only night data so far),
+    # so it must not erase a value that was already recorded.
+    final_pulse_avg_day = pulse_avg_day if pulse_avg_day > 0 else existing["pulse_avg_day"]
 
     # well_being: preserve the existing value exactly. For a brand-new note,
     # parse_note() supplies the creation default of 9.
@@ -344,7 +366,7 @@ async def sync_endpoint(request: Request,
         "created": date,
         "related": build_related_link(date),
         "sleep_hours": final_sleep_hours,
-        "pulse_avg_day": pulse_avg_day,
+        "pulse_avg_day": final_pulse_avg_day,
         "pulse_avg_sleep": final_pulse_avg_sleep,
         "steps_total": final_steps_total,
         "sleep_awakenings": final_sleep_awakenings,
@@ -387,7 +409,7 @@ async def sync_endpoint(request: Request,
         logger.info(
             f"✅ /sync: note for {date} saved and verified "
             f"(steps_total={final_steps_total}, sleep={final_sleep_hours}h"
-            f"{' [filled]' if should_fill_sleep else ' [preserved]'})"
+            f"{' [sleep updated]' if replace_sleep else ' [sleep preserved]'})"
         )
         return JSONResponse({
             "status": "ok",

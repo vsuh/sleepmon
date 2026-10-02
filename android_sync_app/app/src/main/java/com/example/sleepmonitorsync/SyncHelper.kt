@@ -80,7 +80,7 @@ object SyncHelper {
             }
             onStatus("📊 Получено файлов: ${result.filesReceived}, минутных записей: ${result.perMinuteSamples.size}, daily-summary: ${result.dailySummaries.size}, sleep-файлов: ${result.sleepSummaries.size}, unsupported: ${result.filesUnsupported}")
 
-            val days = aggregateBandSamples(result.perMinuteSamples, result.dailySummaries, result.sleepSummaries)
+            val days = aggregateBandSamples(context, result.perMinuteSamples, result.dailySummaries, result.sleepSummaries)
             if (days.isNotEmpty()) {
                 SyncQueue.enqueue(
                     context,
@@ -141,6 +141,7 @@ object SyncHelper {
     )
 
     private fun aggregateBandSamples(
+        context: android.content.Context,
         samples: List<ActivitySample>,
         summaries: List<com.example.sleepmonitorsync.band.activity.DailySummary>,
         sleepSummaries: List<SleepDetailsParser.SleepSummary>,
@@ -150,6 +151,18 @@ object SyncHelper {
                 sameMinute.firstOrNull { it.steps != null || it.heartRate != null } ?: sameMinute.first()
             }
             .values
+
+        // Whole-day waking pulse needs the WHOLE day, but the band sends each minute file once.
+        // HrHistory keeps every sample we ever received (idempotent by timestamp) plus the known
+        // sleep windows, so the average below does not depend on what this particular sync fetched.
+        val hrHistory = HrHistory.mergeAndLoad(
+            context,
+            unique,
+            sleepSummaries.map { it.bedTimeSeconds to it.wakeupTimeSeconds },
+        )
+        val hrHistoryByDay = hrHistory.hr.entries.groupBy {
+            Instant.ofEpochSecond(it.key.toLong()).atZone(ZoneId.systemDefault()).toLocalDate()
+        }
 
         val byDay = unique.groupBy {
             Instant.ofEpochSecond(it.timestampSeconds.toLong()).atZone(ZoneId.systemDefault()).toLocalDate()
@@ -176,8 +189,15 @@ object SyncHelper {
             // Minute details may contain only partial/duplicate slices, so they
             // must not override the summary when it is available.
             val stepsTotal = summary?.steps?.coerceAtLeast(0) ?: sampledTotalSteps
-            val hr = daySamples.mapNotNull { it.heartRate?.takeIf { bpm -> bpm > 0 } }
-            val pulse = if (hr.isNotEmpty()) hr.average().toInt() else (summary?.hrAvg ?: 0)
+            // pulse_avg_day = waking HR over the whole day: every stored minute sample of this
+            // date that is not inside any known sleep window (a window can start the day before).
+            val dayHr = hrHistoryByDay[date].orEmpty()
+            val awakeHr = dayHr.filter { !hrHistory.isAsleep(it.key) }.map { it.value }
+            val pulse = when {
+                awakeHr.isNotEmpty() -> awakeHr.average().toInt()
+                dayHr.isNotEmpty() -> 0 // only night data so far: no waking pulse yet (server keeps the old value)
+                else -> summary?.hrAvg ?: 0
+            }
 
             // Sleep summaries are keyed by wake-up date, so the sleep interval may
             // start on the previous calendar day. Use all decoded minute samples,
@@ -196,7 +216,7 @@ object SyncHelper {
                 0
             }
 
-            VersionedLog.i(TAG, "📊 $date: pulse_day=$pulse BPM, pulse_sleep=$sleepPulse BPM")
+            VersionedLog.i(TAG, "📊 $date: pulse_day=$pulse BPM (waking samples=${awakeHr.size}/${dayHr.size}), pulse_sleep=$sleepPulse BPM")
 
             BandDayAggregate(
                 date = date,
