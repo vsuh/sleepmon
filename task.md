@@ -10,10 +10,10 @@ Sleep Monitor получает данные Xiaomi Smart Band по Bluetooth Cla
 
 ## Текущий код
 
-Последние commits кода: a185d1a6de8da54f5e2e775cd153c270e9e2b3ae (sleep payload diagnostics удалены), 42f1d0127043b624f1368b201de24d695be1df1c (v80).
+Последний code commit: 4a75d2b69b812300a746a662fadc77ea59eb009e (production log hygiene).
 
 Android:
-- build tag v80 (02.10.2026);
+- build tag v80; v81 готовится как release candidate (02.10.2026);
 - secure RFCOMM/SPP и Xiaomi auth;
 - получение activity-файлов и daily summary;
 - persistent queue;
@@ -43,7 +43,7 @@ Backend:
 - v78 добавил локальную 7-дневную историю HR для pulse_avg_day;
 - v79 удалил сохранение сырых Xiaomi activity-файлов в `filesDir` и base64-вывод payload в Logcat;
 - v80 удалил из Logcat sleep `packetTrace` и подробные `type10_*` diagnostics;
-- v80 E2E показал, что Logcat больше не содержит raw payload/packetTrace/type10 diagnostics; остаются служебные fileId/размеры/протокол, которые можно сократить перед release.
+- v81 подготовлен для production-log hygiene: убраны hex session-config, fileId/size из manual diagnostics и лишний verbose SPP output.
 
 Последний реальный sleep E2E перед v78 дал sleep HR 63 BPM против значения браслета 63; это подтверждено для v75/v76.
 
