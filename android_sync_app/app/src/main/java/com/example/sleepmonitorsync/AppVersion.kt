@@ -1,7 +1,12 @@
 package com.example.sleepmonitorsync
 
 object AppVersion {
-    /** Single source of truth for the Android app version shown in UI and Logcat. */
+    /**
+     * Single source of truth for the app version (UI, Logcat, APK versionCode/versionName).
+     * build.gradle.kts parses the line `const val NUMBER = <int>` below, so keep that format
+     * and bump the number HERE only. Never lower it: Android refuses to install an APK with
+     * a smaller versionCode over an already installed one.
+     */
     const val NUMBER = 81
     const val DATE = "02.10.2026"
 

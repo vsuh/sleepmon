@@ -15,6 +15,14 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
 }
 
+// Single source of truth for the app version is AppVersion.kt (NUMBER). It is read through the
+// providers API, so the configuration cache re-runs when the file changes.
+val appVersionNumber: Int = providers
+    .fileContents(layout.projectDirectory.file("src/main/java/com/example/sleepmonitorsync/AppVersion.kt"))
+    .asText.get()
+    .let { Regex("""const\s+val\s+NUMBER\s*=\s*(\d+)""").find(it)?.groupValues?.get(1)?.toInt() }
+    ?: error("Cannot find 'const val NUMBER = <int>' in AppVersion.kt")
+
 android {
     namespace = "com.example.sleepmonitorsync"
     compileSdk = 36
@@ -22,8 +30,8 @@ android {
         applicationId = "com.example.sleepmonitorsync"
         minSdk = 28
         targetSdk = 36
-        versionCode = 81
-        versionName = "81"
+        versionCode = appVersionNumber
+        versionName = appVersionNumber.toString()
     }
 
     signingConfigs {
