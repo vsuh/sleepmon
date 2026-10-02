@@ -76,7 +76,7 @@ object SyncHelper {
             val result = fetch.getOrThrow()
             VersionedLog.i(TAG, "Xiaomi fetch result: received=${result.filesReceived}, failed=${result.filesFailed}, unsupported=${result.filesUnsupported}, sleep=${result.sleepSummaries.size}, minuteSamples=${result.perMinuteSamples.size}, dailySummaries=${result.dailySummaries.size}")
             if (result.unsupportedFileDescriptions.isNotEmpty()) {
-                VersionedLog.w(TAG, "Unsupported activity files: ${result.unsupportedFileDescriptions.joinToString("; ")}")
+                VersionedLog.w(TAG, "Unsupported activity files: ${result.unsupportedFileDescriptions.size}")
             }
             onStatus("📊 Получено файлов: ${result.filesReceived}, минутных записей: ${result.perMinuteSamples.size}, daily-summary: ${result.dailySummaries.size}, sleep-файлов: ${result.sleepSummaries.size}, unsupported: ${result.filesUnsupported}")
 
@@ -363,7 +363,7 @@ object SyncHelper {
             val setCookieHeader = loginResp.header("Set-Cookie")
             val finalUrl = loginResp.request.url
             val bodyPreview = loginResp.peekBody(512).string().replace("\n", " ").replace("\r", " ")
-            VersionedLog.d(TAG, "Login response: HTTP ${loginResp.code}, finalUrl=$finalUrl, setCookie=${setCookieHeader != null}, body=$bodyPreview")
+            VersionedLog.d(TAG, "Login response: HTTP ${loginResp.code}, setCookie=${setCookieHeader != null}")
             val cookie = cookieStore.firstOrNull { it.name == "session_pin" }?.let {
                 "session_pin=" + it.value
             } ?: throw Exception("Login failed: HTTP " + loginResp.code + ", finalUrl=" + finalUrl + ", session cookie missing")
@@ -540,7 +540,7 @@ object SyncHelper {
 
                 if (syncResp.isSuccessful) {
                     val responseBody = syncResp.body?.string().orEmpty()
-                    VersionedLog.i(TAG, "✅ Server accepted data for $date (HTTP ${syncResp.code}): $responseBody")
+                    VersionedLog.i(TAG, "✅ Server accepted data for $date (HTTP ${syncResp.code})")
                 } else {
                     throw Exception("Server returned HTTP ${syncResp.code}")
                 }
