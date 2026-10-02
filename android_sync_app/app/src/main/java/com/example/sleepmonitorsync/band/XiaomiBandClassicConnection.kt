@@ -363,7 +363,7 @@ class XiaomiBandClassicConnection(
             XiaomiSppFrameV2.PACKET_TYPE_SESSION_CONFIG -> {
                 if (!sessionConfigHandled) {
                     sessionConfigHandled = true
-                    VersionedLog.i(TAG, "Session config response: ${frame.payload.joinToString(" ") { "%02x".format(it) }}")
+                    VersionedLog.i(TAG, "Session config response received")
                     sendPhoneNonce(sock)
                 }
             }
@@ -599,7 +599,7 @@ class XiaomiBandClassicConnection(
     /** Diagnostic only: decode Xiaomi ACTIVITY_MANUAL_SAMPLES records without using them for pulse aggregation. */
     private fun logManualSamplesDiagnostics(fileId: XiaomiActivityFileId, data: ByteArray) {
         if (fileId.version != 2 || data.size < 13) {
-            VersionedLog.i(TAG, "Manual samples: file=${fileId.raw.joinToString("") { "%02x".format(it) }}, version=${fileId.version}, size=${data.size}, unsupported_version")
+            VersionedLog.i(TAG, "Manual samples file received; parser version unsupported")
             return
         }
 
@@ -783,7 +783,7 @@ class XiaomiBandClassicConnection(
             .build()
 
         if (sendEncryptedProtobufCommand(sock, command)) {
-            VersionedLog.i(TAG, "↻ Requested past activity files (health subtype=2, protobufBytes=4)")
+            VersionedLog.i(TAG, "↻ Requested past activity files")
         } else {
             VersionedLog.w(TAG, "⚠️ Failed to request past activity files (health subtype=2)")
         }
