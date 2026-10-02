@@ -61,7 +61,7 @@ GitHub Actions и GitHub Releases отсутствуют, поэтому авт�
 
 ### Android APK
 
-Для личного sideload функциональная архитектура близка к рабочей, но v78 пока не считать production APK.
+Для личного sideload функциональная архитектура близка к рабочей, но v79 пока не считать production APK.
 
 Стоп-факторы:
 - нет E2E v79;
@@ -71,7 +71,7 @@ GitHub Actions и GitHub Releases отсутствуют, поэтому авт�
 
 Перед production APK:
 1. собрать release APK локально;
-3. установить и провести полный E2E;
+2. установить и провести полный E2E;
 4. проверить очередь, server failover и ACK;
 5. убедиться, что Logcat не содержит health payload.
 
@@ -102,7 +102,7 @@ Backend архитектурно готов к production deployment, но те�
 ## Ближайшие шаги
 
 1. Собрать v79 release APK локально.
-3. E2E: обычная синхронизация → /sync → ACK.
+2. E2E: обычная синхронизация → /sync → ACK.
 4. E2E: сервер недоступен → очередь → восстановление → повтор → ACK → очистка очереди.
 5. Проверить несколько последовательных дней и pulse_avg_day/pulse_avg_sleep.
 6. Обновить production HELOR до проверенного commit.
