@@ -28,15 +28,18 @@ android {
     signingConfigs {
         if (keystorePropertiesFile.exists()) {
             create("release") {
-                val configuredStoreFile = keystoreProperties["storeFile"] as String
+                val configuredStoreFile = keystoreProperties.getProperty("storeFile", "sleepmon-release.jks")
                 storeFile = if (File(configuredStoreFile).isAbsolute) {
                     File(configuredStoreFile)
                 } else {
                     keystorePropertiesFile.parentFile.resolve(configuredStoreFile)
                 }
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
+                storePassword = keystoreProperties.getProperty("storePassword")
+                    ?: error("Missing storePassword in $keystorePropertiesFile")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                    ?: error("Missing keyAlias in $keystorePropertiesFile")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                    ?: error("Missing keyPassword in $keystorePropertiesFile")
             }
         }
     }
