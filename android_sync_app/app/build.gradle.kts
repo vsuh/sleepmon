@@ -1,7 +1,8 @@
+import java.io.File
 import java.io.FileInputStream
 import java.util.Properties
 
-val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystorePropertiesFile = rootProject.file("../../../_secrets/sleepmon-apk/keystore.properties")
 val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
     FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
@@ -27,7 +28,12 @@ android {
     signingConfigs {
         if (keystorePropertiesFile.exists()) {
             create("release") {
-                storeFile = file(keystoreProperties["storeFile"] as String)
+                val configuredStoreFile = keystoreProperties["storeFile"] as String
+                storeFile = if (File(configuredStoreFile).isAbsolute) {
+                    File(configuredStoreFile)
+                } else {
+                    keystorePropertiesFile.parentFile.resolve(configuredStoreFile)
+                }
                 storePassword = keystoreProperties["storePassword"] as String
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
@@ -42,7 +48,7 @@ android {
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
-                logger.warn("Release APK will be UNSIGNED: create android_sync_app/keystore.properties first.")
+                logger.warn("Release APK will be UNSIGNED: create ../../../_secrets/sleepmon-apk/keystore.properties first.")
             }
         }
     }
@@ -92,6 +98,9 @@ dependencies {
   // Arch Components
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
+  implementation(libs.androidx.navigation3.ui)
+  implementation(libs.androidx.navigation3.runtime)
+  implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 
   // Compose
   implementation(libs.androidx.compose.ui)
