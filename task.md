@@ -10,10 +10,10 @@ Sleep Monitor получает данные Xiaomi Smart Band по Bluetooth Cla
 
 ## Текущий код
 
-Последние commits кода: 567a3d3f5be7a9d27ce878d7e3817f351040e93c (raw dump удалён), 6c1afe0810fc1e4890f2dc9ca10bc37864c28755 (v79).
+Последние commits кода: a185d1a6de8da54f5e2e775cd153c270e9e2b3ae (sleep payload diagnostics удалены), 42f1d0127043b624f1368b201de24d695be1df1c (v80).
 
 Android:
-- build tag v79 (02.10.2026);
+- build tag v80 (02.10.2026);
 - secure RFCOMM/SPP и Xiaomi auth;
 - получение activity-файлов и daily summary;
 - persistent queue;
@@ -41,16 +41,17 @@ Backend:
 - sleep HR берётся из собственного HR-блока sleep-файла внутри bed..wake;
 - type=10 больше не используется как источник sleep HR;
 - v78 добавил локальную 7-дневную историю HR для pulse_avg_day;
-- v79 удалил сохранение сырых Xiaomi activity-файлов в `filesDir` и base64-вывод payload в Logcat.
+- v79 удалил сохранение сырых Xiaomi activity-файлов в `filesDir` и base64-вывод payload в Logcat;
+- v80 удалил из Logcat sleep `packetTrace` и подробные `type10_*` diagnostics.
 
 Последний реальный sleep E2E перед v78 дал sleep HR 63 BPM против значения браслета 63; это подтверждено для v75/v76.
 
-## Что ещё НЕ подтверждено для v79
+## Что ещё НЕ подтверждено для v80
 
-Нет реального E2E-результата именно v79 после удаления диагностического dump и версии приложения.
+v79 E2E частично подтверждён, но после него найден и исправлен дополнительный payload-logging blocker; v80 ещё не собран/не установлен.
 
 Не подтверждены:
-1. v79 APK реально собран и установлен;
+1. v80 APK реально собран и установлен;
 2. новый pulse_avg_day проверен на нескольких последовательных синхронизациях;
 3. восстановление после недоступного сервера и последующий ACK проверены на актуальном коде;
 4. production Docker deployment актуального commit проверен на HELOR.
@@ -61,10 +62,10 @@ GitHub Actions и GitHub Releases отсутствуют, поэтому авт�
 
 ### Android APK
 
-Для личного sideload функциональная архитектура близка к рабочей, но v79 пока не считать production APK.
+Для личного sideload функциональная архитектура близка к рабочей, но v80 пока не считать production APK.
 
 Стоп-факторы:
-- нет E2E v79;
+- нет E2E v80;
 - release build имеет isMinifyEnabled = false;
 - release signing/distribution не настроены;
 - versionCode остаётся 1, build tag живёт отдельно в AppVersion.
@@ -101,7 +102,7 @@ Backend архитектурно готов к production deployment, но те�
 
 ## Ближайшие шаги
 
-1. Собрать v79 release APK локально.
+1. Собрать v80 release APK локально.
 2. E2E: обычная синхронизация → /sync → ACK.
 4. E2E: сервер недоступен → очередь → восстановление → повтор → ACK → очистка очереди.
 5. Проверить несколько последовательных дней и pulse_avg_day/pulse_avg_sleep.
