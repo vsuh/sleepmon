@@ -10,7 +10,7 @@ Sleep Monitor получает данные Xiaomi Smart Band по Bluetooth Cla
 
 ## Текущий код
 
-Последние code/build commits: 2279e1362dc91d5385f3f1815c7597cf13b8624d (v81), 04adff5573431479cc87a16771128980c24ab243 (local release signing).
+Последние code/build commits: 2279e1362dc91d5385f3f1815c7597cf13b8624d (v81), 04adff5573431479cc87a16771128980c24ab243 (local release signing), 92d76d55cfc95321fc482dddc8f1ae384ce1c000 (signing secrets ignored).
 
 Android:
 - build tag v81 (02.10.2026);
@@ -74,7 +74,7 @@ GitHub Actions и GitHub Releases отсутствуют, поэтому авт�
 Стоп-факторы:
 - нет E2E v80;
 - release build имеет isMinifyEnabled = false;
-- release signing теперь настроен через локальный `keystore.properties`, секреты не хранятся в Git;
+- release signing теперь настроен через локальный `keystore.properties`, секреты не хранятся в Git; `keystore.properties`, `*.jks`, `*.keystore` игнорируются.
 - `versionCode=81`, `versionName=81`, build tag живёт в AppVersion.
 
 Перед production APK:
