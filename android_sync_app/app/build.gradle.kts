@@ -73,6 +73,16 @@ android {
     }
 }
 
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            if (variant.name == "release") {
+                output.outputFileName.set("sleepmon.apk")
+            }
+        }
+    }
+}
+
 kotlin {
     jvmToolchain(17)
 }
