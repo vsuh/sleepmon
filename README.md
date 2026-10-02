@@ -86,6 +86,42 @@ android_sync_app/app/build/outputs/apk/debug/app-debug.apk
 
 APK в рабочем контейнере проекта не собирается; локальную сборку выполняет разработчик.
 
+## Release APK и подпись
+
+Release signing настраивается локально через `android_sync_app/keystore.properties`; keystore и файл с паролями игнорируются Git.
+
+1. В `android_sync_app` создайте keystore, если его ещё нет:
+
+```bash
+keytool -genkeypair -v -keystore sleepmon-release.jks -alias sleepmon -keyalg RSA -keysize 2048 -validity 10000
+```
+
+2. Создайте рядом `keystore.properties`:
+
+```properties
+storeFile=sleepmon-release.jks
+storePassword=ВАШ_ПАРОЛЬ
+keyAlias=sleepmon
+keyPassword=ВАШ_ПАРОЛЬ
+```
+
+3. Соберите подписанный APK:
+
+```bat
+cd android_sync_app
+gradlew.bat assembleRelease
+```
+
+APK: `android_sync_app/app/build/outputs/apk/release/app-release.apk`.
+
+Проверка подписи:
+
+```bat
+apksigner verify --verbose app\build\outputs\apk\release\app-release.apk
+```
+
+Не добавляйте keystore и пароли в Git. Release-ключ нужно хранить и резервировать отдельно.
+
 ### Настройка
 
 В приложении задаются:
