@@ -10,10 +10,10 @@ Sleep Monitor получает данные Xiaomi Smart Band по Bluetooth Cla
 
 ## Текущий код
 
-Последние code commits: 4a75d2b69b812300a746a662fadc77ea59eb009e (SPP log hygiene), 14a587c30c2cda425af620c514537c4ce85cffd7 (HTTP log hygiene).
+Последний code commit: 2279e1362dc91d5385f3f1815c7597cf13b8624d (v81 release candidate).
 
 Android:
-- build tag v80; v81 готовится как release candidate (02.10.2026);
+- build tag v81 (02.10.2026);
 - secure RFCOMM/SPP и Xiaomi auth;
 - получение activity-файлов и daily summary;
 - persistent queue;
