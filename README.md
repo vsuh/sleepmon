@@ -7,399 +7,62 @@ title: Sleep Monitor
 
 # Sleep Monitor
 
-Личная система дневника сна, пульса, активности и самочувствия в Obsidian.
+Личная система дневника сна, пульса, активности и самочувствия.
 
-Основной источник данных — **Xiaomi Smart Band**. Android Companion App напрямую соединяется с браслетом по Bluetooth Classic SPP, получает накопленные activity-файлы, агрегирует дневные показатели и отправляет их на FastAPI. FastAPI записывает данные в Obsidian через Local REST API.
+Xiaomi Smart Band → Android Companion App → FastAPI → Obsidian Local REST API.
 
-Проект однопользовательский. Аналитика и графики находятся за пределами приложения и могут строиться в Obsidian/Dataview.
+Проект однопользовательский. Аналитика выполняется в Obsidian/Dataview.
 
-**Текущая Android-версия: v40 (26.09.2026).**
+**Текущий Android build tag: v78 (02.10.2026).**
 
----
+> v78 ещё не является финальным production APK: требуется E2E именно этого build и удаление диагностического dump сырых Xiaomi-файлов перед production.
 
 ## Архитектура
 
 ```
 Xiaomi Smart Band
-      │ Bluetooth Classic / secure RFCOMM (SPP)
+      │ secure Bluetooth Classic / RFCOMM (SPP)
       ▼
 Android Companion App
       │ persistent queue
       │ POST /login → session cookie
       │ POST /sync
       ▼
-FastAPI :8000
-      │ HTTPS
+FastAPI
       │ Obsidian Local REST API
       ▼
-Obsidian in Docker
-      │
-      ▼
-/app/vault
-      │
-      ▼
-/path-to-projects/syncthing/AI.obsdn
+Obsidian vault
 ```
 
-Принципиальные правила:
+Ключевые правила:
 
-- Android использует только **secure RFCOMM/SPP**.
-- После загрузки activity-файлов download-сеанс закрывается.
-- После успешного `/sync` открывается новый SPP-сеанс для ACK файлов.
-- Файл считается подтверждённым браслету только после успешной обработки сервером и ACK.
-- При недоступном сервере данные остаются в `filesDir/xiaomi_sync_queue.json`.
-- Для дневного итога шагов используется Xiaomi daily summary `version=5`, если он доступен.
-- Субъективные поля `well_being`, `sleep_quality`, `alco` и свободный текст не перезаписываются автоматической синхронизацией.
+- используется secure RFCOMM/SPP;
+- после получения activity-файлов download-сеанс закрывается;
+- после успешного /sync открывается отдельный SPP-сеанс для ACK;
+- при ошибке сервера или ACK данные остаются в persistent queue;
+- steps_total берётся из Xiaomi daily summary v5, когда summary доступен;
+- автоматический /sync не изменяет well_being, sleep_quality, alco и свободный текст;
+- запись в vault выполняется только через Obsidian Local REST API.
 
----
-
-## Структура репозитория
+## Репозиторий
 
 ```
 sleepmon/
-├── app/                         # FastAPI + HTML UI
-├── android_sync_app/            # Android Companion App
+├── app/                  # FastAPI
+├── android_sync_app/     # Android Companion App
 ├── docker-compose.yml
 ├── .env.example
-├── task.md                      # рабочая задача и техническая история
-└── README.md                    # эксплуатационная документация
+├── task.md               # актуальное состояние и следующий шаг
+└── README.md
 ```
 
----
+Разработка ведётся в checkout проекта внутри Obsidian vault. Production checkout находится отдельно на сервере HELOR.
 
-# 1. Где ведётся разработка и где работает продукт
+## Android Companion App
 
-Это **не два независимых проекта**.
+Исходники находятся в `android_sync_app/`.
 
-GitHub `vsuh/sleepmon` — центральный репозиторий. Дерево проекта для разработки находится внутри Obsidian vault:
-
-```
-C:\AI.obsdn\10-projects\sleep-monitor
-```
-
-Именно в этом checkout выполняется разработка и изменения отражаются в GitHub.
-
-На Linux-сервере **HELOR** находится отдельный production checkout:
-
-```
-services/opt/sleepmon
-```
-
-Этот каталог получает проект из GitHub и является **продуктовой средой**, в которой запускается Docker Compose.
-
-Типовой цикл:
-
-```
-Obsidian vault checkout
-C:\AI.obsdn\10-projects\sleep-monitor
-        │
-        ├── изменение
-        ├── git add
-        ├── git commit
-        └── git push
-                │
-                ▼
-        GitHub: vsuh/sleepmon
-                │
-                ▼
-HELOR production checkout
-services/opt/sleepmon
-        │
-        ├── git pull
-        └── docker compose up -d --build app
-```
-
-**Важно:** перед сборкой на HELOR обязательно получить свежий commit через `git pull`. Иначе Docker может успешно собрать старую версию проекта.
-
----
-
-# 2. Первичное развёртывание на HELOR
-
-Если production checkout ещё не создан:
-
-```bash
-cd /path-2-prj/services/opt
-git clone https://github.com/vsuh/sleepmon.git sleepmon
-cd sleepmon
-```
-
-Если checkout уже существует:
-
-```bash
-cd /path-2-prj/services/opt/sleepmon
-git pull
-```
-
-Создать рабочую конфигурацию:
-
-```bash
-cp .env.example .env
-```
-
-Минимальный `.env`:
-
-```env
-APP_PIN=<ваш PIN>
-OBSIDIAN_BASE_URL=https://obsidian:27124
-OBSIDIAN_API_KEY=<ключ Local REST API>
-```
-
-`APP_PIN` — PIN веб-приложения и одновременно пароль, который Android Companion App передаёт на `/login`.
-
-**Не путать два ключа:**
-
-- `APP_PIN` — секрет авторизации Sleep Monitor API;
-- `OBSIDIAN_API_KEY` — секрет плагина Obsidian Local REST API;
-- Xiaomi **auth key** — 32 hex-символа для Bluetooth-аутентификации конкретного браслета. Он хранится на телефоне и вводится в Android-приложение.
-
-Запуск:
-
-```bash
-docker compose up -d --build
-```
-
-Проверка:
-
-```bash
-docker compose ps
-docker compose logs -f app
-```
-
-Веб-интерфейс:
-
-```
-http://<IP-HELOR>:8000
-```
-
----
-
-# 3. Настройка Obsidian и Local REST API
-
-Compose запускает два сервиса:
-
-- `obsidian` — Obsidian/Electron внутри контейнера;
-- `app` — FastAPI.
-
-В текущем `docker-compose.yml` vault внутри контейнера доступен по пути `/app/vault`, а на хосте это `/path-to-projects/syncthing/AI.obsdn`.
-
-```text
-host:      /path-to-projects/syncthing/AI.obsdn
-container: /app/vault
-
-obsidian:
-  volume:
-    /path-to-projects/syncthing/AI.obsdn:/app/vault:rw
-  ports:
-    8080:8080
-    27124:27124
-```
-
-Порт `8080` используется для VNC-доступа к Obsidian при первоначальной настройке.
-
-Порядок:
-
-1. Запустить `obsidian`.
-2. Через VNC/noVNC открыть Obsidian.
-3. Открыть vault, смонтированный внутри контейнера как `/app/vault`.
-4. Установить/включить Community Plugin **Local REST API**.
-5. Настроить Local REST API на порт `27124`.
-6. Bind Address должен быть `0.0.0.0`, чтобы контейнер `app` мог обратиться к нему.
-7. Сгенерировать API key плагина.
-8. Записать этот ключ в production `.env` как `OBSIDIAN_API_KEY`.
-9. Перезапустить `app` после изменения `.env`:
-
-```bash
-docker compose up -d --build app
-```
-
-Внутри Docker-сети FastAPI обращается к Obsidian по:
-
-```
-https://obsidian:27124
-```
-
-FastAPI не должен напрямую изменять markdown-файлы vault: запись выполняется через Local REST API, чтобы Obsidian оставался источником истины для своих данных и кеша.
-
----
-
-# 4. API приложения синхронизации
-
-Это API **самого FastAPI приложения Sleep Monitor**, а не Xiaomi API и не Obsidian API.
-
-Базовый URL:
-
-```
-http://<server>:8000
-```
-
-## `POST /login`
-
-Авторизация Android и Web UI.
-
-Параметр формы:
-
-| Параметр | Тип | Назначение |
-|---|---|---|
-| `pin` | string | значение `APP_PIN` |
-
-При правильном PIN сервер устанавливает cookie:
-
-```
-session_pin=<APP_PIN>
-```
-
-Android сохраняет значение `Set-Cookie` и передаёт его следующим запросом.
-
-Пример:
-
-```bash
-curl -i -c cookies.txt \
-  -X POST http://<server>:8000/login \
-  -d 'pin=<ваш PIN>'
-```
-
-При неправильном PIN сервер возвращает HTML страницы входа с сообщением об ошибке.
-
-## `POST /sync`
-
-Основной endpoint автоматической синхронизации Android.
-
-Авторизация: cookie `session_pin`, полученная через `/login`.
-
-Content-Type:  HTML form encoding (`application/x-www-form-urlencoded`).
-
-Параметры:
-
-| Параметр | Тип | Default | Назначение |
-|---|---:|---:|---|
-| `date` | string | — | дата `YYYY-MM-DD` |
-| `sleep_hours` | float | 0 | длительность сна |
-| `pulse_avg_day` | int | 0 | средний пульс в период бодрствования |
-| `pulse_avg_sleep` | int | 0 | средний пульс во время сна |
-| `steps_total` | int | 0 | итоговое число шагов |
-| `sleep_awakenings` | int | 0 | число отдельных эпизодов пробуждения |
-
-Пример:
-
-```bash
-curl -b cookies.txt \
-  -X POST http://<server>:8000/sync \
-  -d 'date=2026-09-26' \
-  -d 'sleep_hours=7.5' \
-  -d 'pulse_avg_day=68' \
-  -d 'pulse_avg_sleep=58' \
-  -d 'steps_total=7300' \
-  -d 'sleep_awakenings=2'
-```
-
-Успешный ответ:
-
-```json
-{"status":"ok","date":"2026-09-26","steps_total":7300}
-```
-
-Поведение `/sync`:
-
-- читает текущую запись непосредственно из Obsidian;
-- `steps_total` обновляется всегда;
-- `pulse_avg_day` и `pulse_avg_sleep` обновляются;
-- `sleep_hours` и `sleep_awakenings` заполняются только если соответствующие данные ещё не были записаны;
-- `well_being`, `sleep_quality`, `alco` и свободный текст сохраняются;
-- после записи заметка перечитывается;
-- сохранённый `steps_total` проверяется;
-- при невозможности безопасно прочитать текущую заметку сервер возвращает `502`, чтобы не рисковать потерей ручных данных.
-
-Основные ошибки:
-
-- `401` — нет корректной сессии;
-- `502` — Obsidian недоступен, запись не выполнена или результат записи не удалось проверить.
-
-## `POST /save`
-
-Ручное полное сохранение дневной записи из Web UI.
-
-Параметры:
-
-```
-date
-sleep_hours
-pulse_avg_day
-pulse_avg_sleep
-steps_total
-well_being
-sleep_quality
-alco
-notes
-```
-
-
-`/save` предназначен для ручного редактирования и, в отличие от `/sync`, может изменять субъективные поля.
-
-## `GET /logout`
-
-Удаляет cookie веб-сессии и перенаправляет на `/login`.
-
-## `GET /`
-
-Web UI дневной записи. Требует авторизации.
-
----
-
-# 5. Схема дневной записи
-
-Файлы дневника:
-
-```
-55-sleepmon/<YYYY>/<MM>/<YYYY-MM-DD>.md
-```
-
-Пример:
-
-```
-55-sleepmon/2026/09/2026-09-26.md
-```
-
-Пример frontmatter:
-
-```yaml
----
-project: "sleepmon"
-created: "2026-09-26"
-related: "[[55-sleepmon/2026/index-09.md]]"
-sleep_hours: 7.5
-pulse_avg_day: 68
-pulse_avg_sleep: 58
-steps_total: 7300
-sleep_awakenings: 2
-well_being: 7
-sleep_quality: 8
-alco: false
----
-
-## Заметки
-
-Свободный текст.
-```
-
-### Поля пользователя
-
-- `well_being` — субъективное самочувствие `0…9`;
-- `sleep_quality` — субъективное качество сна, целое `0…9`;
-- `alco` — был ли алкоголь;
-- текст примечания `## Заметки`.
-
-Для новой записи `well_being=9,sleep_quality=9,alco=false`. Автоматическая синхронизация не меняет эти поля.
-
----
-
-# 6. Установка Android Companion App
-
-APK собирается из каталога:
-
-```
-android_sync_app/
-```
-
+### Сборка
 
 Windows:
 
@@ -412,7 +75,7 @@ Linux/macOS/WSL:
 
 ```bash
 cd android_sync_app
-./gradlew assembleDebug
+./gradlew :app:assembleDebug
 ```
 
 APK:
@@ -421,172 +84,196 @@ APK:
 android_sync_app/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Установка:
+APK в рабочем контейнере проекта не собирается; локальную сборку выполняет разработчик.
 
-```bash
-adb install -r app-debug.apk
-```
+### Настройка
 
-После установки нужно:
+В приложении задаются:
 
-1. Сопрячь браслет с Android в системных настройках Bluetooth (это возможно после установки mi fitness, сопряжения браслета и удаления mi fitness).
-2. Запустить Sleep Monitor Sync.
-3. Предоставить требуемые разрешения (Bluetooth).
-4. Открыть **⚙ Настройки**.
-5. Заполнить параметры сервера и Xiaomi Band (адрес сервера синхронизации, резервный адрес, app PIN, mac адрес и ключ авторизации браслета).
-6. Сохранить ключ браслета.
-7. Нажать **Sync Now** и проверить logcat.
+- основной URL FastAPI;
+- резервный URL FastAPI;
+- App PIN;
+- MAC-адрес браслета;
+- Xiaomi auth key — 32 hex-символа.
 
----
+App PIN должен совпадать с `APP_PIN` на сервере.
 
-# 7. Настройки Android APK
+Xiaomi auth key относится к конкретному браслету. Это секрет: не хранить его в Git, README, issue или Logcat.
 
-Экран **⚙ Настройки** содержит две группы.
+### Получение Xiaomi auth key
 
-## Сервер синхронизации
+Текущий UI рекомендует внешний инструмент `xiaomi-extractor`. Он не входит в этот репозиторий.
 
-### Server URL (основной)
+Общий порядок:
 
-Адрес FastAPI:
+1. привязать браслет в Mi Fitness;
+2. получить auth/encryption key внешним extractor;
+3. проверить, что ключ содержит 32 hex-символа;
+4. ввести MAC и ключ в Sleep Monitor;
+5. сохранить;
+6. перед прямым SPP-сеансом исключить параллельное подключение Mi Fitness.
 
-```
-http://<server>:8000
-```
+### Фоновая синхронизация
 
-Текущий встроенный default:
+Используется WorkManager с периодом 60 минут. После загрузки Android также планирует работу после BOOT_COMPLETED.
 
-```
-http://192.168.2.2:8000
-```
+Временные гарантии запуска не даются: фактическое выполнение зависит от Android/WorkManager.
 
-### Server URL (резервный)
-
-Резервный адрес FastAPI.
-
-Текущий встроенный default:
-
-```
-https://your.ddns.org:999
-```
-
-Если основной сервер не отвечает, приложение пробует резервный.
-
-### App PIN
-
-Должен совпадать с `APP_PIN` на сервере.
-
-Текущий встроенный default:
-
-```
-APP_PIN=<ваш PIN>
-```
-
-Если `APP_PIN` на сервере изменён, это значение также нужно изменить в APK через **Настройки → App PIN**.
-
-**В Android нет отдельного API key для `/sync`: приложение сначала делает `POST /login` с этим PIN, получает session cookie и использует её для `/sync`.**
-
----
-
-## Xiaomi Band
-
-### MAC-адрес
-
-Bluetooth MAC конкретного браслета.
-
-Его нужно вводить для того устройства, с которым Android уже выполнит Bluetooth pairing.
-
-### Ключ авторизации
-
-Поле требует **ровно 32 hex-символа**:
-
-```
-0123456789abcdef0123456789abcdef
-```
-
-Это 16-байтовый Xiaomi pairing/auth secret конкретного браслета.
-
-В коде приложения ключ нормализуется: начальный `0x` допускается и удаляется.
-
-### Как получить Xiaomi auth key
-
-В текущем приложении текст подсказки на экране настроек рекомендует использовать **xiaomi-extractor**. Сам extractor не является частью этого репозитория, поэтому его инструкция и версия должны проверяться отдельно.
-
-Общий надёжный принцип:
-
-1. Сначала привязать браслет в официальном **Mi Fitness**.
-2. Получить с помощью [xiaomi-extractor](https://github.com/piotrmachowski/xiaomi-cloud-tokens-extractor) encription key (TOKEN).
-3. Убедиться, что это значение содержит 32 hex-символа.
-4. Ввести его в **Настройки → Xiaomi Band → Ключ авторизации**.
-5. Ввести MAC этого же браслета.
-6. Нажать **Сохранить ключ браслета**.
-7. Перед подключением удалить Mi Fitness, чтобы оно не удерживало Bluetooth-соединение.
-
-
-**Encription key (TOKEN) — секрет, аналогичный паролю. Не помещать его в Git, README, issue или публичные логи.** При отвязке/перепривязке устройства к Mi Fitness, ключ пересоздается тогда его нужно получить заново. 
-
----
-
-# 8. Первый запуск синхронизации
-
-После настройки:
-
-1. Убедиться, что браслет включён.
-2. Убедиться, что он сопряжён с Android.
-3. Удалить Mi Fitness.
-4. Открыть Sleep Monitor Sync.
-5. Проверить **Настройки**.
-6. Запустить logcat
-```
-adb logcat -c && adb logcat -s SyncWorker SyncHelper XiaomiBandClassic
-```
-1. Нажать **Sync Now**.
-
-Нормальная последовательность в logcat:
-
-```
-SPP socket connected
-Auth handshake complete
-Band offered N file(s)
-Server accepted data ... (HTTP 200)
-Acknowledged N activity file(s) on fresh SPP session
-═══ Xiaomi sync session finished
-```
-
-В начале операции должен быть виден build tag, например:
-
-```
-SyncHelper: === v40 (26.09.2026) - SyncHelper ===
-```
-
----
-
-# 9. Фоновая синхронизация
-
-Android использует WorkManager.
-
-Задача восстанавливается после перезагрузки телефона через BootReceiver.
-
-Фактическое время запуска зависит от ограничений Android/WorkManager. Расписание не следует воспринимать как гарантию запуска с точностью до минуты.
-
-При недоступном сервере данные помещаются в:
+Persistent queue хранится в app-private storage:
 
 ```
 filesDir/xiaomi_sync_queue.json
 ```
 
-Очередь переживает перезапуск приложения, но **не переживает удаление приложения**, поскольку находится в app-specific storage.
+Удаление приложения удаляет эту очередь.
 
----
+## Надёжность доставки
 
-# 10. Деплой после изменения кода
+Порядок операций:
 
-На компьютере разработки:
-
-```text
-cd /d C:\AI.obsdn\10-projects\sleep-monitor
+```
+SPP auth
+  ↓
+получение activity-файлов
+  ↓
+локальная очередь
+  ↓
+POST /login
+  ↓
+POST /sync для queued days
+  ↓
+новый SPP-сеанс
+  ↓
+ACK file IDs
+  ↓
+очистка queue
 ```
 
-После изменения:
+Очередь очищается только после успешного ACK.
+
+Если сервер недоступен, Android пробует backup URL. Если сервер принял данные, но ACK не прошёл, очередь сохраняется и операция повторяется.
+
+## FastAPI
+
+Backend находится в `app/`.
+
+Основные endpoints:
+
+| Endpoint | Назначение |
+|---|---|
+| `POST /login` | авторизация по APP_PIN |
+| `POST /sync` | автоматическая merge-синхронизация Android |
+| `POST /save` | ручное полное сохранение из Web UI |
+| `GET /logout` | завершение web-сессии |
+| `GET /` | Web UI |
+
+### /sync
+
+Android передаёт:
+
+- date;
+- sleep_hours;
+- pulse_avg_day;
+- pulse_avg_sleep;
+- steps_total;
+- sleep_awakenings.
+
+`/sync`:
+
+1. проверяет session cookie;
+2. читает текущую заметку непосредственно из Obsidian;
+3. обновляет машинные показатели;
+4. сохраняет пользовательские поля;
+5. записывает заметку через Local REST API;
+6. перечитывает её;
+7. проверяет сохранённый steps_total;
+8. возвращает HTTP 200 только после успешной проверки.
+
+Если текущее состояние заметки нельзя достоверно прочитать, endpoint возвращает 502 вместо риска затереть данные.
+
+### /save
+
+`/save` предназначен для ручного редактирования. Он позволяет менять:
+
+- sleep_hours;
+- pulse_avg_day;
+- pulse_avg_sleep;
+- steps_total;
+- well_being;
+- sleep_quality;
+- alco;
+- notes.
+
+Новые subjective-поля имеют default 9. `sleep_quality` валидируется в диапазоне 0…9.
+
+## Obsidian
+
+Все чтение и запись дневных заметок проходят через Local REST API.
+
+Путь заметки:
+
+```
+55-sleepmon/<YYYY>/<MM>/<YYYY-MM-DD>.md
+```
+
+Пример:
+
+```yaml
+---
+project: "sleepmon"
+created: "2026-10-02"
+related: "[[55-sleepmon/2026/index-10.md]]"
+sleep_hours: 7.5
+pulse_avg_day: 68
+pulse_avg_sleep: 63
+steps_total: 7300
+sleep_awakenings: 2
+well_being: 9
+sleep_quality: 9
+alco: false
+---
+
+## Заметки
+
+Свободный текст.
+```
+
+Автоматическая синхронизация не должна затирать subjective/user-owned поля и свободный текст.
+
+## Docker Compose
+
+Compose поднимает:
+
+- `obsidian`;
+- `app`;
+- `dbtool`.
+
+Типовой запуск:
+
+```bash
+docker compose up -d --build
+docker compose ps
+docker compose logs -f app
+```
+
+Переменные production задаются в `.env`:
+
+```env
+APP_PIN=<секрет>
+OBSIDIAN_BASE_URL=https://obsidian:27124
+OBSIDIAN_API_KEY=<секрет Local REST API>
+SLEEPMON_BACKUP_DIR=<каталог backup>
+```
+
+`.env` не коммитится.
+
+Для production сначала настроить Obsidian Local REST API и получить его API key, затем указать его в `.env`.
+
+## Deployment
+
+После изменения кода:
+
+### Development
 
 ```bash
 git status
@@ -595,113 +282,95 @@ git commit -m "описание изменения"
 git push
 ```
 
-На HELOR:
+### HELOR
 
 ```bash
-cd /path-2-prj/services/opt/sleepmon
+cd /path/to/sleepmon
 git pull
 docker compose up -d --build app
-```
-
-Проверка:
-
-```bash
 docker compose ps
 docker compose logs -f app
 ```
 
-Если менялась только конфигурация `.env`, пересобрака образа не обязательна; достаточно перезапустить нужный сервис:
+Перед deployment всегда проверить, что checkout содержит именно проверенный commit.
+
+Если менялся только `.env`:
 
 ```bash
 docker compose up -d app
 ```
 
-Если менялись Dockerfile, Python, templates или другие файлы, влияющие на образ, использовать:
+## Production checklist
+
+### Android
+
+- [ ] release APK собран локально;
+- [ ] build tag соответствует проверенному commit;
+- [ ] secure SPP/auth;
+- [ ] обычный sync → /sync → ACK;
+- [ ] server failover;
+- [ ] queue сохраняется при ошибке;
+- [ ] queue очищается после успешного ACK;
+- [ ] несколько последовательных sync;
+- [ ] pulse_avg_day проверен на нескольких днях;
+- [ ] pulse_avg_sleep проверен против данных браслета;
+- [ ] диагностический raw-file/base64 dump отключён.
+
+### FastAPI
+
+- [ ] production `.env` настроен;
+- [ ] Obsidian Local REST API доступен;
+- [ ] /login работает;
+- [ ] /sync создаёт/обновляет заметку;
+- [ ] /sync не затирает пользовательские поля;
+- [ ] /sync проверяет сохранённый результат;
+- [ ] ошибка Obsidian приводит к 502 без опасного перезаписывания;
+- [ ] Docker restart policy работает;
+- [ ] backup настроен.
+
+## Диагностика
+
+Android:
 
 ```bash
-docker compose up -d --build app
+adb logcat -c
+adb logcat -s SyncWorker SyncHelper XiaomiBandClassic
 ```
 
+Ищем последовательность:
 
----
-
-# 11. Обновление APK
-
-После изменения Android-кода:
-
-1. повысить `APP_BUILD_TAG`;
-2. обновить `task.md`;
-3. собрать APK локально;
-4. установить APK через `adb install -r`;
-5. выполнить E2E-синхронизацию;
-6. зафиксировать результат теста с build tag.
-
----
-
-# 12. Диагностика сервера
-
-Логи:
-
-```bash
-cd /path-2-prj/services/opt/sleepmon
-docker compose logs -f app
+```
+SPP socket connected
+Auth handshake complete
+Band offered N file(s)
+Server accepted data
+Acknowledged N activity file(s) on fresh SPP session
+Xiaomi sync session finished
 ```
 
-Статус:
+Сервер:
 
 ```bash
 docker compose ps
+docker compose logs -f app
 ```
 
-Если app не может обратиться к Obsidian, проверить:
+При HTTP 502 сначала проверить доступность Obsidian Local REST API и логи `app`.
 
-- контейнер `obsidian`;
-- Local REST API;
-- bind address `0.0.0.0`;
-- `OBSIDIAN_BASE_URL`;
-- `OBSIDIAN_API_KEY`;
-- Docker network.
+При ошибке secure SPP проверить pairing, отсутствие параллельного соединения Mi Fitness и повторить Sync Now. Insecure SPP не является fallback.
 
-Если `/sync` возвращает `502`, сначала проверить доступность Obsidian и логи `app`.
+## Ограничения
 
----
-
-# 13. Диагностика secure SPP
-
-Ошибка:
-
-```
-Secure SPP connect() failed: read failed, socket might closed or timeout
-```
-
-не обязательно означает окончательный отказ. Приложение делает несколько secure RFCOMM-попыток.
-
-Порядок:
-
-1. проверить Bluetooth pairing;
-2. исключить параллельное соединение Mi Fitness;
-3. повторить **Sync Now**;
-4. при необходимости перезапустить браслет;
-5. смотреть logcat до `Auth handshake complete` или окончательной ошибки.
-
-Возвращать insecure SPP как обходной путь нельзя: insecure fallback удалён после диагностики v39.
-
----
-
-# 14. Ограничения
-
-- Xiaomi не предоставляет этому проекту официальный публичный API для прямого чтения всех данных браслета; Android использует reverse-engineered Bluetooth SPP протокол.
-- Браслет хранит накопленные данные ограниченное время. Практическое тестирование показало примерно 7–10 дней доступных данных после повторного сопряжения; это не гарантия для каждого типа файла.
-- Не следует рассчитывать на произвольный backfill очень старых данных.
-- Некоторые Xiaomi activity-файлы могут быть неполными/слишком короткими.
-- После перезагрузки браслета secure SPP иногда требует несколько попыток подключения.
+- Протокол Xiaomi reverse-engineered и не является официальным API.
+- Браслет хранит данные ограниченное время; не следует рассчитывать на произвольный старый backfill.
+- Некоторые activity-файлы могут быть неполными.
+- После перезагрузки браслета secure SPP иногда требует нескольких попыток.
 - Удаление Android-приложения удаляет persistent queue.
-- Xiaomi auth key зависит от конкретного устройства и состояния его привязки.
 
----
+## Текущее состояние
 
-# 15. Связанные документы
+На 02.10.2026 актуален Android v78.
 
-- `task.md` — текущая задача, архитектурные решения, E2E-результаты и история принципиальных изменений.
-- `.env.example` — параметры серверной конфигурации.
-- `android_sync_app/` — исходный код Android Companion App.
+Архитектура синхронизации и backend-путь подтверждены E2E. v78 ещё требует финального E2E и отключения диагностического raw payload dump перед production.
+
+Подробное актуальное состояние и следующий шаг находятся в `task.md`.
