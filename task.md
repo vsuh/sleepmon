@@ -10,10 +10,10 @@ Sleep Monitor получает данные Xiaomi Smart Band по Bluetooth Cla
 
 ## Текущий код
 
-Последний commit: 4e578b4208baaed799659495dc28eea33fdadeb9.
+Последние commits кода: 567a3d3f5be7a9d27ce878d7e3817f351040e93c (raw dump удалён), 6c1afe0810fc1e4890f2dc9ca10bc37864c28755 (v79).
 
 Android:
-- build tag v78 (02.10.2026);
+- build tag v79 (02.10.2026);
 - secure RFCOMM/SPP и Xiaomi auth;
 - получение activity-файлов и daily summary;
 - persistent queue;
@@ -40,16 +40,17 @@ Backend:
 - сон v4/subtype 8 разбирается;
 - sleep HR берётся из собственного HR-блока sleep-файла внутри bed..wake;
 - type=10 больше не используется как источник sleep HR;
-- v78 добавил локальную 7-дневную историю HR для pulse_avg_day.
+- v78 добавил локальную 7-дневную историю HR для pulse_avg_day;
+- v79 удалил сохранение сырых Xiaomi activity-файлов в `filesDir` и base64-вывод payload в Logcat.
 
 Последний реальный sleep E2E перед v78 дал sleep HR 63 BPM против значения браслета 63; это подтверждено для v75/v76.
 
-## Что ещё НЕ подтверждено для v78
+## Что ещё НЕ подтверждено для v79
 
-Нет реального E2E-результата именно v78 после изменения расчёта pulse_avg_day.
+Нет реального E2E-результата именно v79 после удаления диагностического dump и версии приложения.
 
 Не подтверждены:
-1. v78 APK реально собран и установлен;
+1. v79 APK реально собран и установлен;
 2. новый pulse_avg_day проверен на нескольких последовательных синхронизациях;
 3. восстановление после недоступного сервера и последующий ACK проверены на актуальном коде;
 4. production Docker deployment актуального commit проверен на HELOR.
@@ -63,15 +64,13 @@ GitHub Actions и GitHub Releases отсутствуют, поэтому авт�
 Для личного sideload функциональная архитектура близка к рабочей, но v78 пока не считать production APK.
 
 Стоп-факторы:
-- нет E2E v78;
-- актуальный код сохраняет сырые Xiaomi activity-файлы в filesDir/raw_band_files и пишет их в Logcat как base64;
+- нет E2E v79;
 - release build имеет isMinifyEnabled = false;
 - release signing/distribution не настроены;
 - versionCode остаётся 1, build tag живёт отдельно в AppVersion.
 
 Перед production APK:
-1. удалить/отключить raw-file dump и подробную payload-диагностику;
-2. собрать release APK локально;
+1. собрать release APK локально;
 3. установить и провести полный E2E;
 4. проверить очередь, server failover и ACK;
 5. убедиться, что Logcat не содержит health payload.
@@ -102,8 +101,7 @@ Backend архитектурно готов к production deployment, но те�
 
 ## Ближайшие шаги
 
-1. Убрать production-опасный raw-file dump/payload logging.
-2. Собрать следующий release APK локально.
+1. Собрать v79 release APK локально.
 3. E2E: обычная синхронизация → /sync → ACK.
 4. E2E: сервер недоступен → очередь → восстановление → повтор → ACK → очистка очереди.
 5. Проверить несколько последовательных дней и pulse_avg_day/pulse_avg_sleep.
