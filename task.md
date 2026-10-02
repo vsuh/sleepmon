@@ -54,7 +54,7 @@ Backend:
 - secure SPP/auth и получение 29 файлов прошли;
 - sleep v4/subtype 8: duration 463 min, awakenings 8, pulse_sleep=63 BPM;
 - pulse_day=76 BPM для 01.10 и 02.10 по текущей истории HR;
-- при поднятом локальном backend `/login` и `/sync` ранее подтверждены HTTP 200, а в текущем тесте локальный `192.168.2.2:8000` был недоступен;
+- backend `/login` → `/sync` дополнительно проверен пользователем после запуска backend и работает;
 - backup `https://sm.vsuh.duckdns.org:912` в текущем тесте отдавал HTTP 502;
 - данные не потерялись: после неуспешного sync ACK не выполнялся, очередь должна сохранять записи.
 
@@ -72,9 +72,10 @@ GitHub Actions и GitHub Releases отсутствуют, поэтому авт�
 Для личного sideload функциональная архитектура близка к рабочей, но v80 пока не считать production APK.
 
 Стоп-факторы:
-- нет E2E v80;
+- нет финального E2E v81 после изменений Logcat/signing;
 - release build имеет isMinifyEnabled = false;
-- release signing теперь настроен через локальный `keystore.properties`, секреты не хранятся в Git; `keystore.properties`, `*.jks`, `*.keystore` игнорируются.
+- release signing настроен через локальный `keystore.properties`, секреты не хранятся в Git; `keystore.properties`, `*.jks`, `*.keystore` игнорируются;
+- README содержит пошаговую инструкцию создания keystore и `assembleRelease`.
 - `versionCode=81`, `versionName=81`, build tag живёт в AppVersion.
 
 Перед production APK:
