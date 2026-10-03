@@ -245,8 +245,11 @@ async def save(request: Request,
         existing_content = obsidian.get_note_content(date)
         existing = parse_note(existing_content)
     except ObsidianFetchError as e:
-        logger.warning(f"/save: could not read existing note for {date} to preserve current values: {e}")
-        existing = parse_note(None)
+        logger.error(f"❌ /save: cannot read current state for {date}, aborting: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Cannot verify current note state for {date}, aborting save to avoid data loss: {e}"
+        )
 
     def parse_float_snapshot(value: str) -> float:
         try:
