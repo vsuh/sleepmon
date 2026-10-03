@@ -7,7 +7,7 @@ services:
       - PGID=1000
       - TZ=Europe/Moscow
     volumes:
-      - /mnt/hdd/syncthing/AI.obsdn:/vault:rw
+      - /mnt/hdd/syncthing/AI.obsdn:/vaults/AI.obsdn:rw
       - /opt/sleepmon/config/obsidian:/config:rw
     ports:
       - "8080:8080" # VNC access for initial setup
