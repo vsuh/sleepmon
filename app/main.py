@@ -97,37 +97,36 @@ def parse_note(content: str | None) -> dict:
 
 
 app = FastAPI()
-MONTHLY_SYNC_TASK: asyncio.Task | None = None
+HOURLY_SYNC_TASK: asyncio.Task | None = None
 
 
-async def _monthly_storage_sync_loop():
+async def _hourly_storage_sync_loop():
     while True:
         try:
-            if datetime.date.today().day == 1:
-                await asyncio.to_thread(storage.sync_previous_month)
+            await asyncio.to_thread(storage.sync_recent_months)
         except asyncio.CancelledError:
             raise
         except Exception:
-            logger.exception("Monthly storage sync loop failed")
-        await asyncio.sleep(6 * 60 * 60)
+            logger.exception("Hourly storage sync loop failed")
+        await asyncio.sleep(60 * 60)
 
 
 @app.on_event("startup")
-async def start_monthly_storage_sync():
-    global MONTHLY_SYNC_TASK
-    MONTHLY_SYNC_TASK = asyncio.create_task(_monthly_storage_sync_loop())
+async def start_hourly_storage_sync():
+    global HOURLY_SYNC_TASK
+    HOURLY_SYNC_TASK = asyncio.create_task(_hourly_storage_sync_loop())
 
 
 @app.on_event("shutdown")
-async def stop_monthly_storage_sync():
-    global MONTHLY_SYNC_TASK
-    if MONTHLY_SYNC_TASK:
-        MONTHLY_SYNC_TASK.cancel()
+async def stop_hourly_storage_sync():
+    global HOURLY_SYNC_TASK
+    if HOURLY_SYNC_TASK:
+        HOURLY_SYNC_TASK.cancel()
         try:
-            await MONTHLY_SYNC_TASK
+            await HOURLY_SYNC_TASK
         except asyncio.CancelledError:
             pass
-        MONTHLY_SYNC_TASK = None
+        HOURLY_SYNC_TASK = None
 
 
 
