@@ -1,7 +1,14 @@
+; VSCraft@2026 sleepmon apk build script
+; Скрипт получает обновления из github.com/vsuh/sleepmon, собирает release нового apk файла
+; проверяет подпись и устанавливает на подключенное по ADB устройство
+; прекращает работу, после любого неудавшегося этапа
+;
 @echo off
 setlocal
-
+SET "ANDROID_SDK_ROOT=%appdata%\..\local\Android\Sdk\"
+SET "myADB=D:\bin\adb\adb.exe"
 cd /d "%~dp0"
+git pull
 
 echo [1/3] Building signed release APK...
 call gradlew.bat assembleRelease
@@ -53,14 +60,25 @@ if errorlevel 1 (
 
 echo.
 echo [3/3] Installing APK on the connected phone...
-where adb >nul 2>&1
-if errorlevel 1 (
+
+for /f "delims=" %%i in ('where adb 2^>nul') do set "_ADB=%%i"
+
+if defined _ADB SET "ADB=_ADB"
+
+
+if NOT defined ADB (
     echo.
-    echo ERROR: adb was not found in PATH.
+    echo ADB env. variable not set
     exit /b 1
 )
 
-adb install -r "%APK%"
+if NOT EXIST %ADB% (
+    echo.
+    echo ERROR: %ADB% was not found.
+    exit /b 1
+)
+
+%ADB% install -r "%APK%"
 if errorlevel 1 (
     echo.
     echo ERROR: APK installation failed.
