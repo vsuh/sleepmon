@@ -8,3 +8,7 @@ graphify-out/
 *.log
 *.zip
 
+
+# Local SQLite data
+/data/
+*.db
