@@ -2,6 +2,13 @@
 
 Дата актуализации: 03.10.2026
 
+## Проверка Edge
+
+- Пользователь сообщил, что кнопки формы не отображаются в Microsoft Edge.
+- Навигационные SVG заменены на текстовые glyph-иконки, а CSS получил явные appearance, размеры, цвет и line-height для Edge.
+- Фон кнопок остаётся прозрачным.
+- Runtime-проверка после обновления ещё не выполнена; перед проверкой нужен Ctrl+F5.
+
 ## Цель
 
 Sleep Monitor получает данные Xiaomi Smart Band по Bluetooth Classic SPP, агрегирует их на Android и отправляет дневные показатели в FastAPI. FastAPI изменяет дневные заметки через Obsidian Local REST API.
@@ -10,7 +17,7 @@ Sleep Monitor получает данные Xiaomi Smart Band по Bluetooth Cla
 
 ## Текущий код
 
-Последние code/build commits: f744cda03e8056f6a9df7f98403f04aaf5fd4f92 (release APK filename), 9d345c08585daefe61ae9f71f4ba0eccb66ed090 (release signing property defaults), 85be81f04652c03d841b4c7e9da49c51f35b1d54 (release signing config cleanup), cc5ad10946d6f9938b0ee1ca0d87b87a63e3ac37 (external release signing secrets), 2279e1362dc91d5385f3f1815c7597cf13b8624d (v81), 04adff5573431479cc87a16771128980c24ab243 (local release signing), 92d76d55cfc95321fc482dddc8f1ae384ce1c000 (signing secrets ignored).
+Последние code/build commits: 68babede1bcc00d740815e4fff9e06a8d1019083 (Edge-visible date navigation CSS), 5e41bfd76d0d93a53b2d7ac7cfc4d889cc8c0bcd (Edge-safe date navigation markup), f744cda03e8056f6a9df7f98403f04aaf5fd4f92 (release APK filename), 9d345c08585daefe61ae9f71f4ba0eccb66ed090 (release signing property defaults), 85be81f04652c03d841b4c7e9da49c51f35b1d54 (release signing config cleanup), cc5ad10946d6f9938b0ee1ca0d87b87a63e3ac37 (external release signing secrets), 2279e1362dc91d5385f3f1815c7597cf13b8624d (v81), 04adff5573431479cc87a16771128980c24ab243 (local release signing), 92d76d55cfc95321fc482dddc8f1ae384ce1c000 (signing secrets ignored).
 
 Android:
 - build tag v81 (02.10.2026);
