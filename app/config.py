@@ -23,3 +23,9 @@ OBSIDIAN_BASE_URL: str = os.getenv("OBSIDIAN_BASE_URL", "https://obsidian:27124"
 OBSIDIAN_API_KEY: str = os.getenv("OBSIDIAN_API_KEY", "")
 """API-РєР»СЋС‡ РїР»Р°РіРёРЅР° Obsidian Local REST API."""
 
+
+STORAGE_SERVICE: str = os.getenv("STORAGE_SERVICE", "obsidian").strip().lower()
+"""Backend used by /save and /sync: sqlite or obsidian."""
+
+SLEEPMON_SQLITE_PATH: str = os.getenv("SLEEPMON_SQLITE_PATH", "/data/sleepmon.db")
+"""SQLite database path used as the local secondary/primary backend."""
