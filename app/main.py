@@ -101,14 +101,29 @@ HOURLY_SYNC_TASK: asyncio.Task | None = None
 
 
 async def _hourly_storage_sync_loop():
+    retry_delay = 60
+    hourly_delay = 60 * 60
+
     while True:
         try:
             await asyncio.to_thread(storage.sync_recent_months)
         except asyncio.CancelledError:
             raise
-        except Exception:
-            logger.exception("Hourly storage sync loop failed")
-        await asyncio.sleep(60 * 60)
+        except Exception as exc:
+            # A dependent backend (for example Obsidian REST API) may still be
+            # starting or may be temporarily unavailable. Keep the app alive
+            # and retry soon instead of turning a transient outage into a
+            # noisy one-hour failure window.
+            logger.warning(
+                "Hourly storage sync failed: %s; retrying in %s seconds",
+                exc,
+                retry_delay,
+            )
+            await asyncio.sleep(retry_delay)
+            continue
+
+        logger.info("Hourly storage sync completed successfully; next run in %s seconds", hourly_delay)
+        await asyncio.sleep(hourly_delay)
 
 
 @app.on_event("startup")
