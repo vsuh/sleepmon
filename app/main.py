@@ -181,7 +181,7 @@ async def logout():
 
 # ---------- Storage API ----------
 
-@app.post("/api/storage/sync")
+@app.api_route("/api/storage/sync", methods=["GET", "POST"])
 async def storage_sync_api(
     request: Request,
     month: str | None = None,
