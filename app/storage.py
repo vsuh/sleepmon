@@ -47,6 +47,14 @@ def _db() -> sqlite3.Connection:
         )
         """
     )
+    columns = {
+        row["name"]
+        for row in connection.execute("PRAGMA table_info(sync_runs)").fetchall()
+    }
+    if "source_service" not in columns:
+        connection.execute(
+            "ALTER TABLE sync_runs ADD COLUMN source_service TEXT NOT NULL DEFAULT 'obsidian'"
+        )
     connection.commit()
     return connection
 
@@ -114,20 +122,21 @@ def _previous_month(today: datetime.date | None = None) -> str:
 def _sync_run_exists(month: str) -> bool:
     with _db() as db:
         return db.execute(
-            "SELECT 1 FROM sync_runs WHERE month = ?", (month,)
+            "SELECT 1 FROM sync_runs WHERE month = ? AND source_service = ?",
+            (month, STORAGE_SERVICE),
         ).fetchone() is not None
 
 
 def _mark_sync_run(month: str) -> None:
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     with _db() as db:
+        db.execute("DELETE FROM sync_runs WHERE month = ?", (month,))
         db.execute(
             """
-            INSERT INTO sync_runs(month, completed_at)
-            VALUES (?, ?)
-            ON CONFLICT(month) DO UPDATE SET completed_at = excluded.completed_at
+            INSERT INTO sync_runs(month, completed_at, source_service)
+            VALUES (?, ?, ?)
             """,
-            (month, now),
+            (month, now, STORAGE_SERVICE),
         )
         db.commit()
 
