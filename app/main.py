@@ -37,7 +37,7 @@ def get_note_cached(date_str: str) -> str | None:
     to the caller (does NOT swallow it).
 
     NEVER use this for a merge-write (see /sync) — the cache has no
-    invalidation for edits made directly in Obsidian or by other workers,
+    invalidation for edits made directly in the active backend or by other workers,
     so a merge based on cached "existing" data can silently overwrite a
     real value (e.g. well_being) with a stale one."""
     if date_str in NOTE_CACHE:
@@ -217,7 +217,7 @@ async def index(request: Request, background_tasks: BackgroundTasks, date: str =
     try:
         content = get_note_cached(date)
     except ObsidianFetchError as e:
-        logger.warning(f"Could not read note for {date}, showing blank form: {e}")
+        logger.warning(f"Could not read note for {date} from active storage, showing blank form: {e}")
         content = None
 
     data = {
@@ -378,9 +378,9 @@ async def save(request: Request,
             target_date = shift_date(date, 1)
         return RedirectResponse(url=f"/?date={target_date}", status_code=status.HTTP_302_FOUND)
     else:
-        logger.error(f"❌ /save: failed to save note for {date} to Obsidian")
+        logger.error(f"❌ /save: failed to save note for {date} to active storage")
         return HTMLResponse(
-            content=f"<h2>Ошибка сохранения в Obsidian</h2><p><a href='/?date={date}'>Назад</a></p>",
+            content=f"<h2>Ошибка сохранения</h2><p><a href='/?date={date}'>Назад</a></p>",
             status_code=500
         )
 
