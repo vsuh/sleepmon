@@ -103,6 +103,7 @@ Backend архитектурно готов к production deployment, но те�
 8. проверить backup dbtool/volume.
 
 ## Последние изменения
+- `docker-compose.yml` сохраняет SQLite-файл приложения в `./data:/data`, чтобы база переживала пересоздание контейнера.
 - `.env.example` дополнен выбором `STORAGE_SERVICE=sqlite|obsidian` и путём `SLEEPMON_SQLITE_PATH`.
 - `app/main.py` переведён на выбранный storage backend: `/save` и `/sync` используют `STORAGE_SERVICE`; добавлен защищённый `POST /api/storage/sync`, а автоматическая сверка предыдущего месяца запускается 1-го числа и повторно проверяется каждые 6 часов.
 - В `app/config.py` добавлены `STORAGE_SERVICE` и `SLEEPMON_SQLITE_PATH` для выбора backend через `.env`.
