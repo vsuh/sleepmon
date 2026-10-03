@@ -195,6 +195,17 @@ def sync_previous_month(force: bool = False) -> dict:
     return sync_month(_previous_month(), force=force)
 
 
+def sync_recent_months() -> dict:
+    """Reconcile the current and previous calendar months."""
+    today = datetime.date.today()
+    current_month = today.strftime("%Y-%m")
+    previous_month = _previous_month(today)
+    return {
+        "current": sync_month(current_month, force=True),
+        "previous": sync_month(previous_month, force=True),
+    }
+
+
 def startup_sync() -> None:
     """Synchronize the previous month once after startup when needed."""
     try:
