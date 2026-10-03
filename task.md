@@ -102,6 +102,10 @@ Backend архитектурно готов к production deployment, но те�
 7. /sync при недоступном Obsidian должен возвращать 502 и не затирать данные;
 8. проверить backup dbtool/volume.
 
+## Последние изменения
+
+- `android_sync_app/build-release-install.bat` добавлен: последовательно выполняет `assembleRelease` → проверку `sleepmon.apk` через `apksigner` → `adb install -r`; при любой ошибке следующий шаг не запускается.
+
 ## Правила разработки
 
 - APK не собирать в рабочем контейнере; сборку выполняет пользователь локально.
