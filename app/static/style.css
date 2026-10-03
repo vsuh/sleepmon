@@ -191,6 +191,8 @@ button {
     font-weight: 600;
     font-size: 1rem;
     transition: all 0.2s ease;
+    appearance: none;
+    -webkit-appearance: none;
 }
 
 .btn-sync {
@@ -332,10 +334,13 @@ h2 {
     width: 56px;
     height: 56px;
     padding: 0;
+    margin: 0;
     background: transparent;
-    color: var(--text-muted);
+    color: var(--text-main);
     border: 0;
     border-radius: 50%;
+    line-height: 1;
+    overflow: visible;
 }
 
 .date-nav-button:first-child {
@@ -348,17 +353,24 @@ h2 {
 
 .date-nav-button:hover {
     background: transparent;
-    color: var(--text-main);
+    color: var(--primary);
 }
 
-.date-nav-button svg {
+.date-nav-button:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.date-nav-button span {
+    display: block;
     width: 48px;
     height: 48px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    color: inherit;
+    font-family: Arial, sans-serif;
+    font-size: 48px;
+    font-weight: 400;
+    line-height: 42px;
+    text-align: center;
 }
 
 @media (max-width: 520px) {
