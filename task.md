@@ -5,6 +5,7 @@
 ## Текущая настройка синхронизации
 
 - Сверка SQLite и Obsidian теперь выполняется автоматически каждый час для текущего и предыдущего месяца.
+- Поле «Самочувствие» в web-форме ограничено диапазоном 0–9.
 - Если backend временно недоступен (например, Obsidian ещё запускается), hourly loop не падает: пишет предупреждение и повторяет попытку через 60 секунд; после успешной сверки возвращается к часовому интервалу.
 - `/api/storage/sync` доступен как GET и POST; на форме под заголовком добавлена ссылка для ручного запуска.
 - Runtime-проверка нового hourly sync и ссылки ещё не выполнена; отдельно проверено по логам, что временная недоступность Obsidian должна обрабатываться повторными попытками без падения приложения.
@@ -24,7 +25,7 @@ Sleep Monitor получает данные Xiaomi Smart Band по Bluetooth Cla
 
 ## Текущий код
 
-Последние code/build commits: 1903b1f7ebc413e1f761a5b8dc38d35c05e653fb (retry при временной недоступности backend), 6ff4f94b46cacbd15aa30374e80f400e309586ef (hourly storage reconciliation), fdd5957ab7920840ba038b302c7f66ab55a52cd7 (hourly backend loop), 9f129bcedb0b430688e670f3f0a15a5c3310e236 (GET/POST storage sync API), 346b6ef967597ec0e9f8581844a7796e90d34874 (form sync link), 9ae483ba4bc1aa80c898ae8b68adfd14461702cd (sync link CSS), 68babede1bcc00d740815e4fff9e06a8d1019083 (Edge-visible date navigation CSS), 5e41bfd76d0d93a53b2d7ac7cfc4d889cc8c0bcd (Edge-safe date navigation markup), f744cda03e8056f6a9df7f98403f04aaf5fd4f92 (release APK filename), 9d345c08585daefe61ae9f71f4ba0eccb66ed090 (release signing property defaults), 85be81f04652c03d841b4c7e9da49c51f35b1d54 (release signing config cleanup), cc5ad10946d6f9938b0ee1ca0d87b87a63e3ac37 (external release signing secrets), 2279e1362dc91d5385f3f1815c7597cf13b8624d (v81), 04adff5573431479cc87a16771128980c24ab243 (local release signing), 92d76d55cfc95321fc482dddc8f1ae384ce1c000 (signing secrets ignored).
+Последние code/build commits: 945a81e1dfcf6d264ff509842a847afb98e06d12 (Самочувствие 0–9), 1903b1f7ebc413e1f761a5b8dc38d35c05e653fb (retry при временной недоступности backend), 6ff4f94b46cacbd15aa30374e80f400e309586ef (hourly storage reconciliation), fdd5957ab7920840ba038b302c7f66ab55a52cd7 (hourly backend loop), 9f129bcedb0b430688e670f3f0a15a5c3310e236 (GET/POST storage sync API), 346b6ef967597ec0e9f8581844a7796e90d34874 (form sync link), 9ae483ba4bc1aa80c898ae8b68adfd14461702cd (sync link CSS), 68babede1bcc00d740815e4fff9e06a8d1019083 (Edge-visible date navigation CSS), 5e41bfd76d0d93a53b2d7ac7cfc4d889cc8c0bcd (Edge-safe date navigation markup), f744cda03e8056f6a9df7f98403f04aaf5fd4f92 (release APK filename), 9d345c08585daefe61ae9f71f4ba0eccb66ed090 (release signing property defaults), 85be81f04652c03d841b4c7e9da49c51f35b1d54 (release signing config cleanup), cc5ad10946d6f9938b0ee1ca0d87b87a63e3ac37 (external release signing secrets), 2279e1362dc91d5385f3f1815c7597cf13b8624d (v81), 04adff5573431479cc87a16771128980c24ab243 (local release signing), 92d76d55cfc95321fc482dddc8f1ae384ce1c000 (signing secrets ignored).
 
 Android:
 - build tag v81 (02.10.2026);
