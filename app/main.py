@@ -206,7 +206,7 @@ async def index(request: Request, background_tasks: BackgroundTasks, date: str =
     })
 
 
-# ---------- Save (manual edit from the web form — full overwrite) ----------
+# ---------- Save (manual edit from the web form — snapshot-aware merge) ----------
 
 @app.post("/save")
 async def save(request: Request,
