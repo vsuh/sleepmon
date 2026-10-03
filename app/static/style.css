@@ -67,6 +67,19 @@ h1 {
     -webkit-text-fill-color: transparent;
 }
 
+.storage-sync-link {
+    display: inline-block;
+    margin-top: 0.4rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-decoration: none;
+}
+
+.storage-sync-link:hover {
+    color: var(--text-main);
+    text-decoration: underline;
+}
+
 .btn-outline {
     text-decoration: none;
     color: var(--text-muted);
