@@ -9,41 +9,53 @@
 <body>
     <div class="container">
         <header>
-            <h1>Дневник самочувствия</h1>
+            <h1 title="Данные о сне, пульсе и шагах приходят автоматически с телефона. Здесь можно проверить, поправить значения и сохранить.">Дневник самочувствия</h1>
             <div class="header-links">
                 <a href="/logout" class="btn-outline">Выход</a>
             </div>
         </header>
 
-        <!-- Recent dates navigation -->
-        <nav class="date-nav">
-            {% for d in recent_dates %}
-            <a href="/?date={{ d }}"
-               class="date-nav-item {% if d == date %}active{% endif %}">
-                {% if d == today %}
-                    <span class="date-nav-label">Сегодня</span>
-                {% elif d == (today | replace(today[-2:], '%02d' | format((today[-2:] | int) - 1))) %}
-                    <span class="date-nav-label">Вчера</span>
-                {% else %}
-                    <span class="date-nav-label">{{ d[5:] }}</span>
-                {% endif %}
-                <span class="date-nav-date">{{ d }}</span>
-            </a>
-            {% endfor %}
-            <!-- Custom date picker -->
-            <form action="/" method="get" class="date-nav-item date-picker-item">
-                <input type="date" name="date" value="{{ date }}" onchange="this.form.submit()" title="Выбрать дату">
-            </form>
-        </nav>
-
-        <p class="hint">Данные о сне, пульсе и шагах приходят автоматически с телефона (Android Companion App). Здесь можно проверить/поправить значения и сохранить.</p>
-
         <form action="/save" method="post" class="data-form">
             <input type="hidden" name="date" value="{{ date }}">
+
+            <input type="hidden" name="original_sleep_hours" value="{{ data.sleep_hours }}">
+            <input type="hidden" name="original_pulse_avg_day" value="{{ data.pulse_avg_day }}">
+            <input type="hidden" name="original_pulse_avg_sleep" value="{{ data.pulse_avg_sleep }}">
+            <input type="hidden" name="original_steps_total" value="{{ data.steps_total }}">
+            <input type="hidden" name="original_well_being" value="{{ data.well_being }}">
+            <input type="hidden" name="original_sleep_quality" value="{{ data.sleep_quality }}">
+            <input type="hidden" name="original_alco" value="{{ 'true' if data.alco else 'false' }}">
+            <input type="hidden" name="original_notes" value="{{ data.notes }}">
+
+            <div class="date-nav">
+                <button type="submit" name="navigate" value="prev" class="date-nav-button" title="Назад" aria-label="Назад">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M15 18l-6-6 6-6"></path>
+                    </svg>
+                    <span>Назад</span>
+                </button>
+
+                <div class="date-current" title="Текущая дата">
+                    {{ date }}
+                </div>
+
+                <button type="submit" name="navigate" value="next" class="date-nav-button" title="Вперед" aria-label="Вперед">
+                    <span>Вперед</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9 18l6-6-6-6"></path>
+                    </svg>
+                </button>
+            </div>
 
             <div class="form-group">
                 <label>Сон (часов):</label>
                 <input type="number" step="0.1" name="sleep_hours" value="{{ data.sleep_hours }}">
+            </div>
+
+            <div class="form-group">
+                <label>Как спалось? (0-9):</label>
+                <input type="range" name="sleep_quality" min="0" max="9" value="{{ data.sleep_quality|default(9) }}" oninput="this.nextElementSibling.value = this.value">
+                <output>{{ data.sleep_quality|default(9) }}</output>
             </div>
 
             <div class="form-row">
@@ -60,12 +72,6 @@
             <div class="form-group">
                 <label>Шаги за день:</label>
                 <input type="number" name="steps_total" value="{{ data.steps_total }}">
-            </div>
-
-            <div class="form-group">
-                <label>Как спалось? (0-9):</label>
-                <input type="range" name="sleep_quality" min="0" max="9" value="{{ data.sleep_quality|default(9) }}" oninput="this.nextElementSibling.value = this.value">
-                <output>{{ data.sleep_quality|default(9) }}</output>
             </div>
 
             <div class="form-group">
@@ -86,7 +92,7 @@
                 <textarea name="notes" rows="5">{{ data.notes }}</textarea>
             </div>
 
-            <button type="submit" class="btn-save">Сохранить</button>
+            <button type="submit" name="navigate" value="save" class="btn-save">Сохранить</button>
         </form>
     </div>
 </body>
