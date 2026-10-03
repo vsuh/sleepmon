@@ -113,6 +113,11 @@ def verify_session(request: Request) -> bool:
     return request.cookies.get("session_pin") == APP_PIN
 
 
+def shift_date(date_str: str, days: int) -> str:
+    """Shift a YYYY-MM-DD date by the requested number of days."""
+    return (datetime.date.fromisoformat(date_str) + datetime.timedelta(days=days)).isoformat()
+
+
 def get_recent_dates(n: int = 5) -> list[str]:
     """Return last n dates including today, most recent first."""
     today = datetime.date.today()
@@ -213,50 +218,108 @@ async def save(request: Request,
                well_being: int = Form(9),
                sleep_quality: int = Form(9),
                alco: bool = Form(False),
-               notes: str = Form("")):
+               notes: str = Form(""),
+               original_sleep_hours: str = Form(""),
+               original_pulse_avg_day: str = Form(""),
+               original_pulse_avg_sleep: str = Form(""),
+               original_steps_total: str = Form(""),
+               original_well_being: str = Form("9"),
+               original_sleep_quality: str = Form("9"),
+               original_alco: str = Form("false"),
+               original_notes: str = Form(""),
+               navigate: str = Form("save")):
     if not verify_session(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     if not 0 <= sleep_quality <= 9:
         raise HTTPException(status_code=422, detail="sleep_quality must be between 0 and 9")
 
-    logger.info(f"/save called for {date}: sleep={sleep_hours}h, pulse_day={pulse_avg_day}, "
+    logger.info(f"/save called for {date}: action={navigate}, sleep={sleep_hours}h, pulse_day={pulse_avg_day}, "
                 f"pulse_sleep={pulse_avg_sleep}, steps={steps_total}, well_being={well_being}, sleep_quality={sleep_quality}, alco={alco}")
 
-    # Sleep-phase fields (sleep_light_min/deep/rem/awake) aren't part of this
-    # form — they're populated by /sync from Health Connect. Read the current
-    # note first so a manual save doesn't silently wipe them. Best-effort:
-    # if Obsidian is unreachable, fall back to 0 rather than blocking the
-    # manual save (form must stay usable even when Obsidian is down).
+    # Read the current note before saving. The hidden original_* values are the
+    # snapshot shown when this form was opened. If a field has not changed in
+    # the form, keep the CURRENT value from Obsidian instead of writing the
+    # possibly stale value from the browser. This is especially important for
+    # fields also updated by Android /sync.
     try:
         existing_content = obsidian.get_note_content(date)
         existing = parse_note(existing_content)
     except ObsidianFetchError as e:
-        logger.warning(f"/save: could not read existing note for {date} to preserve sleep phases: {e}")
+        logger.warning(f"/save: could not read existing note for {date} to preserve current values: {e}")
         existing = parse_note(None)
+
+    def parse_float_snapshot(value: str) -> float:
+        try:
+            return round(float(value), 1) if value.strip() else 0.0
+        except ValueError:
+            return 0.0
+
+    def parse_int_snapshot(value: str) -> int:
+        try:
+            return int(value) if value.strip() else 0
+        except ValueError:
+            return 0
+
+    def parse_bool_snapshot(value: str) -> bool:
+        return value.strip().lower() in ("1", "true", "yes", "on")
+
+    submitted_sleep_hours = round(sleep_hours, 1)
+    submitted_pulse_avg_day = pulse_avg_day
+    submitted_pulse_avg_sleep = pulse_avg_sleep
+    submitted_steps_total = steps_total
+
+    sleep_hours_changed = submitted_sleep_hours != parse_float_snapshot(original_sleep_hours)
+    pulse_avg_day_changed = submitted_pulse_avg_day != parse_int_snapshot(original_pulse_avg_day)
+    pulse_avg_sleep_changed = submitted_pulse_avg_sleep != parse_int_snapshot(original_pulse_avg_sleep)
+    steps_total_changed = submitted_steps_total != parse_int_snapshot(original_steps_total)
+    well_being_changed = well_being != parse_int_snapshot(original_well_being)
+    sleep_quality_changed = sleep_quality != parse_int_snapshot(original_sleep_quality)
+    alco_changed = alco != parse_bool_snapshot(original_alco)
+    notes_changed = notes != original_notes
+
+    final_sleep_hours = submitted_sleep_hours if sleep_hours_changed else existing["sleep_hours"]
+    final_pulse_avg_day = submitted_pulse_avg_day if pulse_avg_day_changed else existing["pulse_avg_day"]
+    final_pulse_avg_sleep = submitted_pulse_avg_sleep if pulse_avg_sleep_changed else existing["pulse_avg_sleep"]
+    final_steps_total = submitted_steps_total if steps_total_changed else existing["steps_total"]
+    final_well_being = well_being if well_being_changed else existing["well_being"]
+    final_sleep_quality = sleep_quality if sleep_quality_changed else existing["sleep_quality"]
+    final_alco = alco if alco_changed else existing["alco"]
+    final_notes = notes if notes_changed else existing["notes"]
 
     frontmatter = {
         "project": "sleepmon",
         "created": date,
         "related": build_related_link(date),
-        "sleep_hours": round(sleep_hours, 1),
-        "pulse_avg_day": pulse_avg_day,
-        "pulse_avg_sleep": pulse_avg_sleep,
-        "steps_total": steps_total,
+        "sleep_hours": final_sleep_hours,
+        "pulse_avg_day": final_pulse_avg_day,
+        "pulse_avg_sleep": final_pulse_avg_sleep,
+        "steps_total": final_steps_total,
         "sleep_awakenings": existing["sleep_awakenings"],
-        "well_being": well_being,
-        "sleep_quality": sleep_quality,
-        "alco": alco
+        "well_being": final_well_being,
+        "sleep_quality": final_sleep_quality,
+        "alco": final_alco
     }
 
     yaml_content = yaml.dump(frontmatter, sort_keys=False, allow_unicode=True)
-    note_content = f"---\n{yaml_content}---\n\n## Заметки\n\n{notes}"
+    note_content = f"---\n{yaml_content}---\n\n## Заметки\n\n{final_notes}"
 
     success = obsidian.save_note_content(date, note_content)
 
     if success:
         set_note_cache(date, note_content)
-        logger.info(f"✅ /save: note for {date} saved successfully")
-        return RedirectResponse(url=f"/?date={date}", status_code=status.HTTP_302_FOUND)
+        logger.info(
+            f"✅ /save: note for {date} saved successfully "
+            f"(changed: sleep={sleep_hours_changed}, pulse_day={pulse_avg_day_changed}, "
+            f"pulse_sleep={pulse_avg_sleep_changed}, steps={steps_total_changed}, "
+            f"well_being={well_being_changed}, sleep_quality={sleep_quality_changed}, "
+            f"alco={alco_changed}, notes={notes_changed})"
+        )
+        target_date = date
+        if navigate == "prev":
+            target_date = shift_date(date, -1)
+        elif navigate == "next":
+            target_date = shift_date(date, 1)
+        return RedirectResponse(url=f"/?date={target_date}", status_code=status.HTTP_302_FOUND)
     else:
         logger.error(f"❌ /save: failed to save note for {date} to Obsidian")
         return HTMLResponse(
