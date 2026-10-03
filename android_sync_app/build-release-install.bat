@@ -11,7 +11,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set "APK=%CD%\app\build\outputs\apk\release\sleepmon.apk"
+set "APK=%CD%\app\build\outputs\sleepmon\sleepmon.apk"
 if not exist "%APK%" (
     echo.
     echo ERROR: APK was not created:
