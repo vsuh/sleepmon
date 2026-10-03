@@ -25,6 +25,8 @@ services:
       - TZ=Europe/Moscow
     env_file:
       - .env
+    volumes:
+      - ./data:/data:rw
     depends_on:
       - obsidian
     restart: unless-stopped
