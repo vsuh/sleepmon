@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Form, HTTPException, status, BackgroundTasks
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 import datetime
@@ -8,6 +8,7 @@ import os
 import asyncio
 import logging
 import time
+import base64
 
 from app.config import APP_PIN
 from app import storage
@@ -146,6 +147,8 @@ async def stop_hourly_storage_sync():
 
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
+FAVICON_ICO_BASE64 = "AAABAAIAEBAAAAAAIAAMAwAAJgAAACAgAAAAACAALAEAADIDAACJUE5HDQoaCgAAAA1JSERSAAAAEAAAABAIBgAAAB/z/2EAAALTSURBVHicbZNNaJxVFIafc7+fySTDTNI0M7Y6gm3T1mDUJkVrEmwlaAqidNNVFYsgTXcRcRsXRVBwZTVWsSgI6sIoaKu0NijYLLJoC4oYAnbRpkI7Del0Zky+n3uPi5mSpni35z4v5/C+rxRKfco9T4yHOouzKSICgPEzqFrQ9d/NelIQMcSNW9g0Iczm8DPteGGWqHYTtQli1iP+GmtQZ0mSiE2P7KX/wOuUtg+AhThyzP/8MQszn7FaqxC05VDnmlyh1KeIgDpcmjI0fpwtQ2NcuzTH5QszRKnSU+xhx+irIAmzJyZYvPQjYUcX6mzzBBEhjVYYHv+ILUNj/PLeEU699Tz31ec4NKD8Mf020xOPUVm4yL6JKUo7h0mjRvOczk392p4v69ahl/XoadXt+45oLn+/4m/W9098oaqqm7c+qW35B7W7vFt7nz6sGx7YpYXiw1oo9alBHV4Q8uiBN1m8OMfVC6fIFoqAcvt2lSRJcTYm054njRv88/uvpNEK3HHH2YSwo5Oe3n6u/zWLOtsaKr7vEQQ+UZRQXV4mzGQIsrl1ThgQ1DlsrHhhG3e7Ur1VA2D6q08YfWaEypVr/58DVYdzFuMFiBhSayl0d/HB1EkOvnSUp/YMcu6nrzn2ziTGGJC7NvCCkNVqhfmzn9I7ephMrps0+hfxfMTz+P6Hs5S3PcGZc+ep3LhOdWkJl6wgLRHjnCPI5liYOYmIx/D4cVySENeXEZSO9gyNep39z47x7exVXjj2DRseepw0booYVDF+SFRb4vzUa5QH97J/8juKO0cQ8RA/S65zI3teeZcXJz9HrU/9xhWMH6BoK4mtAsWNZYo7Rth18A02btuNjV1zVQFnHfNnpvj9Ic4m+CFWVC3JnBHJFmt4VJLeeA5enoHsUmzlX//9iWNm4tkcl2ICNpyQ+6tsxgPVIlXath4tRkJEcJsHhO2odYCa8h/udc+u/XASWAAAAAASUVORK5CYIKJUE5HDQoaCgAAAA1JSERSAAAAIAAAACAIBgAAAHN6evQAAADzSURBVHic7ZfBDYMwDEVN1XuPObFAD4hVWIVBWIVVUFfoqVO0p1RRGjv+TiASqk9I4P9fEmxMd3P3NzWMS0vzPwAR0dWSNC0be2+dR0irQ15CydgKogJAjFGQLEDKXBJFnxcBYjHkfLW5LIBG4PV8fK9dP5g0VGWIvtlx3jqPrEYSICS3mmvzmzeiH4CaqzcBHB3nAQhLsgmAh0BBigBcPyQbEAJRZQc4CA1IshWXlGKuPcdRvQq8qcacBQhXbZkFQvNcvmoHrAOJz5uWjdVgAeKzRyGK5wHJ+LCJSBLVRvFMaAWpOhUjILv+F+wR5/kcW+MDD4Ry63oCipIAAAAASUVORK5CYII="
+
 static_dir = os.path.join(base_dir, "static")
 templates_dir = os.path.join(base_dir, "templates")
 
@@ -154,6 +157,15 @@ os.makedirs(templates_dir, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 templates = Jinja2Templates(directory=templates_dir)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(
+        content=base64.b64decode(FAVICON_ICO_BASE64),
+        media_type="image/x-icon",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 def verify_session(request: Request) -> bool:
@@ -390,6 +402,8 @@ async def save(request: Request,
             target_date = shift_date(date, -1)
         elif navigate == "next":
             target_date = shift_date(date, 1)
+        elif navigate == "today":
+            target_date = datetime.date.today().isoformat()
         return RedirectResponse(url=f"/?date={target_date}", status_code=status.HTTP_302_FOUND)
     else:
         logger.error(f"❌ /save: failed to save note for {date} to active storage")
