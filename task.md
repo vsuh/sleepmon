@@ -103,6 +103,7 @@ Backend архитектурно готов к production deployment, но те�
 8. проверить backup dbtool/volume.
 
 ## Последние изменения
+- В `app/config.py` добавлены `STORAGE_SERVICE` и `SLEEPMON_SQLITE_PATH` для выбора backend через `.env`.
 - Добавлен `app/storage.py`: configurable storage `sqlite`/`obsidian`, SQLite-хранилище и ежемесячная reconciliation-синхронизация между двумя backend-сервисами; выбранный в `.env` backend является источником истины при наличии записи с обеих сторон.
 - Уточнён комментарий `/save`: это snapshot-aware merge, а не полная перезапись формы.
 - `/save` теперь также прерывается с HTTP 502, если текущую заметку нельзя прочитать: при навигации или сохранении неизвестное состояние Obsidian не может быть перезаписано значениями формы по умолчанию.
