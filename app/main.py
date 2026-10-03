@@ -10,7 +10,7 @@ import logging
 import time
 
 from app.config import APP_PIN
-from app import obsidian
+from app import storage
 from app.obsidian import ObsidianFetchError
 
 # ---------- Logging ----------
@@ -42,7 +42,7 @@ def get_note_cached(date_str: str) -> str | None:
     real value (e.g. well_being) with a stale one."""
     if date_str in NOTE_CACHE:
         return NOTE_CACHE[date_str]
-    content = obsidian.get_note_content(date_str)
+    content = storage.get_note_content(date_str)
     if content:
         NOTE_CACHE[date_str] = content
     return content
@@ -97,6 +97,39 @@ def parse_note(content: str | None) -> dict:
 
 
 app = FastAPI()
+MONTHLY_SYNC_TASK: asyncio.Task | None = None
+
+
+async def _monthly_storage_sync_loop():
+    while True:
+        try:
+            if datetime.date.today().day == 1:
+                await asyncio.to_thread(storage.sync_previous_month)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Monthly storage sync loop failed")
+        await asyncio.sleep(6 * 60 * 60)
+
+
+@app.on_event("startup")
+async def start_monthly_storage_sync():
+    global MONTHLY_SYNC_TASK
+    MONTHLY_SYNC_TASK = asyncio.create_task(_monthly_storage_sync_loop())
+
+
+@app.on_event("shutdown")
+async def stop_monthly_storage_sync():
+    global MONTHLY_SYNC_TASK
+    if MONTHLY_SYNC_TASK:
+        MONTHLY_SYNC_TASK.cancel()
+        try:
+            await MONTHLY_SYNC_TASK
+        except asyncio.CancelledError:
+            pass
+        MONTHLY_SYNC_TASK = None
+
+
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 static_dir = os.path.join(base_dir, "static")
@@ -145,6 +178,27 @@ async def logout():
     response = RedirectResponse(url="/login")
     response.delete_cookie("session_pin")
     return response
+
+
+# ---------- Storage API ----------
+
+@app.post("/api/storage/sync")
+async def storage_sync_api(
+    request: Request,
+    month: str | None = None,
+    force: bool = False,
+):
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    target_month = month or (datetime.date.today().replace(day=1) - datetime.timedelta(days=1)).strftime("%Y-%m")
+    try:
+        result = await asyncio.to_thread(storage.sync_month, target_month, force)
+        return JSONResponse(result)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.exception("Manual storage sync failed for %s", target_month)
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 # ---------- Main form ----------
@@ -242,7 +296,7 @@ async def save(request: Request,
     # possibly stale value from the browser. This is especially important for
     # fields also updated by Android /sync.
     try:
-        existing_content = obsidian.get_note_content(date)
+        existing_content = storage.get_note_content(date)
         existing = parse_note(existing_content)
     except ObsidianFetchError as e:
         logger.error(f"❌ /save: cannot read current state for {date}, aborting: {e}")
@@ -306,7 +360,7 @@ async def save(request: Request,
     yaml_content = yaml.dump(frontmatter, sort_keys=False, allow_unicode=True)
     note_content = f"---\n{yaml_content}---\n\n## Заметки\n\n{final_notes}"
 
-    success = obsidian.save_note_content(date, note_content)
+    success = storage.save_note_content(date, note_content)
 
     if success:
         set_note_cache(date, note_content)
@@ -383,7 +437,7 @@ async def sync_endpoint(request: Request,
                 f"awakenings={sleep_awakenings}")
 
     try:
-        content = obsidian.get_note_content(date)
+        content = storage.get_note_content(date)
     except ObsidianFetchError as e:
         logger.error(f"❌ /sync: cannot read current state for {date}, aborting: {e}")
         raise HTTPException(
@@ -444,7 +498,7 @@ async def sync_endpoint(request: Request,
     yaml_content = yaml.dump(frontmatter, sort_keys=False, allow_unicode=True)
     note_content = f"---\n{yaml_content}---\n\n## Заметки\n\n{existing['notes']}"
 
-    success = obsidian.save_note_content(date, note_content)
+    success = storage.save_note_content(date, note_content)
 
     if success:
         # Do not report success merely because the write request returned 2xx.
@@ -452,7 +506,7 @@ async def sync_endpoint(request: Request,
         # the step counters actually persisted. This makes a deployment/API/cache
         # problem visible to Android instead of silently accepting a false success.
         try:
-            saved_content = obsidian.get_note_content(date)
+            saved_content = storage.get_note_content(date)
             saved = parse_note(saved_content)
         except ObsidianFetchError as e:
             logger.error(f"❌ /sync: write succeeded but verification read failed for {date}: {e}")
