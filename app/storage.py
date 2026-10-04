@@ -270,6 +270,13 @@ def sync_recent_months() -> dict:
         }
 
     logger.info("Recent storage sync finished: %s", results)
+
+    failed = [name for name, result in results.items() if result.get("status") == "error"]
+    if failed:
+        raise RuntimeError(
+            "Recent storage sync failed for: " + ", ".join(failed)
+        )
+
     return results
 
 
