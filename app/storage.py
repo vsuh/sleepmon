@@ -216,14 +216,61 @@ def sync_previous_month(force: bool = False) -> dict:
 
 
 def sync_recent_months() -> dict:
-    """Reconcile the current and previous calendar months."""
+    """Reconcile the current month through today and the previous month.
+
+    Each month is isolated: a temporary failure in one backend/month must not
+    prevent the other month from being reconciled.
+    """
     today = datetime.date.today()
     current_month = today.strftime("%Y-%m")
     previous_month = _previous_month(today)
-    return {
-        "current": sync_month(current_month, force=True, through_date=today),
-        "previous": sync_month(previous_month, force=True),
-    }
+
+    logger.info(
+        "Starting recent storage sync: current=%s through=%s, previous=%s",
+        current_month,
+        today.isoformat(),
+        previous_month,
+    )
+
+    results: dict[str, dict] = {}
+
+    try:
+        results["current"] = sync_month(
+            current_month,
+            force=True,
+            through_date=today,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Current-month storage sync failed for %s through %s: %s",
+            current_month,
+            today.isoformat(),
+            exc,
+        )
+        results["current"] = {
+            "month": current_month,
+            "status": "error",
+            "through_date": today.isoformat(),
+            "error": str(exc),
+        }
+
+    try:
+        results["previous"] = sync_month(previous_month, force=True)
+    except Exception as exc:
+        logger.warning(
+            "Previous-month storage sync failed for %s: %s",
+            previous_month,
+            exc,
+        )
+        results["previous"] = {
+            "month": previous_month,
+            "status": "error",
+            "through_date": None,
+            "error": str(exc),
+        }
+
+    logger.info("Recent storage sync finished: %s", results)
+    return results
 
 
 def startup_sync() -> None:
