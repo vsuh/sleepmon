@@ -102,13 +102,21 @@ def _other_service() -> str:
     return "sqlite" if STORAGE_SERVICE == "obsidian" else "obsidian"
 
 
-def _month_dates(month: str) -> list[str]:
+def _month_dates(month: str, through_date: datetime.date | None = None) -> list[str]:
     first = datetime.date.fromisoformat(f"{month}-01")
     if first.month == 12:
         next_month = datetime.date(first.year + 1, 1, 1)
     else:
         next_month = datetime.date(first.year, first.month + 1, 1)
-    days = (next_month - first).days
+    last = next_month - datetime.timedelta(days=1)
+
+    if through_date is not None:
+        last = min(last, through_date)
+
+    if last < first:
+        return []
+
+    days = (last - first).days + 1
     return [(first + datetime.timedelta(days=i)).isoformat() for i in range(days)]
 
 
@@ -141,14 +149,23 @@ def _mark_sync_run(month: str) -> None:
         db.commit()
 
 
-def sync_month(month: str, force: bool = False) -> dict:
+def sync_month(
+    month: str,
+    force: bool = False,
+    through_date: datetime.date | None = None,
+) -> dict:
     """Reconcile one calendar month between the two storage backends.
 
     STORAGE_SERVICE wins when both backends contain a note. If only one side
     contains a note, it is copied to the other side. This makes switching the
     configured backend safe and also bootstraps SQLite from an existing vault.
     """
-    if not force and _sync_run_exists(month):
+    partial_month = through_date is not None and month == through_date.strftime("%Y-%m")
+
+    # A current-month sync is intentionally partial (from the 1st through
+    # today), so it must not be suppressed by the monthly completion marker.
+    # Previous/complete months can still use the marker normally.
+    if not force and not partial_month and _sync_run_exists(month):
         return {"month": month, "status": "already_synced", "copied": 0, "missing": 0}
 
     primary_get, primary_save = _backend(STORAGE_SERVICE)
@@ -158,7 +175,7 @@ def sync_month(month: str, force: bool = False) -> dict:
     copied = 0
     missing = 0
 
-    for date_str in _month_dates(month):
+    for date_str in _month_dates(month, through_date=through_date):
         primary = primary_get(date_str)
         secondary = secondary_get(date_str)
 
@@ -178,12 +195,15 @@ def sync_month(month: str, force: bool = False) -> dict:
         else:
             missing += 1
 
-    _mark_sync_run(month)
+    if not partial_month:
+        _mark_sync_run(month)
+
     result = {
         "month": month,
         "status": "synced",
         "source": STORAGE_SERVICE,
         "target": secondary_name,
+        "through_date": through_date.isoformat() if through_date else None,
         "copied": copied,
         "missing": missing,
     }
@@ -201,7 +221,7 @@ def sync_recent_months() -> dict:
     current_month = today.strftime("%Y-%m")
     previous_month = _previous_month(today)
     return {
-        "current": sync_month(current_month, force=True),
+        "current": sync_month(current_month, force=True, through_date=today),
         "previous": sync_month(previous_month, force=True),
     }
 
