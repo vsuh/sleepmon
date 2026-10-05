@@ -162,6 +162,11 @@ Backend архитектурно готов к production deployment, но те�
 - Успешные HTTP-запросы `httpx` к Obsidian (`HTTP Request: GET ... 200 OK`) переведены с INFO на DEBUG, чтобы обычная ежемесячная сверка не засоряла production-log. Общий уровень приложения остаётся INFO.
 - Изменения сделаны в `app/obsidian.py` и `app/main.py`; runtime-проверка новой конфигурации логирования ещё не выполнена.
 
+## Release BAT — сообщение об успешной установке v82 05.10.2026
+
+- В `android_sync_app/build-release-install.bat` итоговая строка теперь явно указывает версию: `SUCCESS: release v82 APK built, signature verified, and APK installed.`
+- Функциональность сборки, проверки подписи и установки APK не изменялась.
+
 ## Правила разработки
 
 - APK не собирать в рабочем контейнере; сборку выполняет пользователь локально.
