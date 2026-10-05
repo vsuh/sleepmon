@@ -13,6 +13,10 @@ import java.util.concurrent.TimeUnit
  *
  * WorkManager has a platform minimum for periodic work; we request a 60-minute
  * interval, matching the user-facing text in MainActivity.
+ *
+ * KEEP is intentional: UPDATE would reset the next-run timer every time the
+ * application process starts (and on every boot), which can postpone an hourly
+ * sync indefinitely on a device that frequently recreates the process.
  */
 object SyncScheduler {
     private const val WORK_NAME = "SleepMonitorSync"
@@ -24,7 +28,7 @@ object SyncScheduler {
         ).build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WORK_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
+            ExistingPeriodicWorkPolicy.KEEP,
             syncWorkRequest
         )
     }
