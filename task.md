@@ -59,6 +59,8 @@ Backend:
 - В той же записи сохраняется timestamp последней полностью успешной синхронизации.
 - Это не меняет очередь: SyncQueue по-прежнему очищается только после успешного ACK.
 - Code commit: 072de9b.
+- После успешного ACK SyncHelper записывает pending days и время завершения в SyncHistory; при ошибке server sync или ACK история не обновляется.
+- Code commit: 8fd6123.
 
 ## Android background sync — актуальное расследование 05.10.2026
 
