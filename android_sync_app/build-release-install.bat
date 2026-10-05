@@ -1,12 +1,14 @@
-; VSCraft@2026 sleepmon apk build script
-; Скрипт получает обновления из github.com/vsuh/sleepmon, собирает release нового apk файла
-; проверяет подпись и устанавливает на подключенное по ADB устройство
-; прекращает работу, после любого неудавшегося этапа
-;
+:; VSCraft@2026 sleepmon apk build script
+:; Скрипт получает обновления из github.com/vsuh/sleepmon, собирает release нового apk файла
+:; проверяет подпись и устанавливает на подключенное по ADB устройство
+:; прекращает работу, после любого неудавшегося этапа
+:;
 @echo off
 setlocal
 SET "ANDROID_SDK_ROOT=%appdata%\..\local\Android\Sdk\"
-SET "myADB=D:\bin\adb\adb.exe"
+SET "ADB=D:\bin\adb\adb.exe"
+SET "ver_f=app\src\main\java\com\example\sleepmonitorsync\AppVersion.kt"
+
 cd /d "%~dp0"
 git pull
 
@@ -84,8 +86,10 @@ if errorlevel 1 (
     echo ERROR: APK installation failed.
     exit /b 1
 )
+for /f  "tokens=1,2 delims==" %%A in ('findstr /C:" const val NUM" %ver_f%') do SET "ver=%%B"
+Set ver=%ver: =%
 
 echo.
-echo SUCCESS: release v82 APK built, signature verified, and APK installed.
+echo SUCCESS: release v%ver% APK built, signature verified, and APK installed.
 echo APK: %APK%
 exit /b 0
