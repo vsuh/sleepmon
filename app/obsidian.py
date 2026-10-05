@@ -9,8 +9,12 @@ TLS-проверка отключена (verify=False), так как Obsidian �
 самоподписанный сертификат и трафик не покидает Docker-сеть.
 """
 
+import logging
 import httpx
 from app.config import OBSIDIAN_BASE_URL, OBSIDIAN_API_KEY
+
+logger = logging.getLogger(__name__)
+_last_fetch_error: str | None = None
 
 
 class ObsidianFetchError(Exception):
@@ -59,10 +63,15 @@ def get_note_content(date_str: str) -> str | None:
         with httpx.Client(verify=False) as client:
             response = client.get(url, headers=headers)
     except Exception as e:
-        print(f"Error fetching note from obsidian: {e}")
-        raise ObsidianFetchError(str(e)) from e
+        global _last_fetch_error
+        error_text = str(e)
+        if error_text != _last_fetch_error:
+            logger.warning("Obsidian fetch failed: %s", error_text)
+            _last_fetch_error = error_text
+        raise ObsidianFetchError(error_text) from e
 
     if response.status_code == 200:
+        _last_fetch_error = None
         return response.text
     if response.status_code == 404:
         return None
