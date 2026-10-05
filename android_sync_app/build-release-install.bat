@@ -86,6 +86,6 @@ if errorlevel 1 (
 )
 
 echo.
-echo SUCCESS: release APK built, signature verified, and APK installed.
+echo SUCCESS: release v82 APK built, signature verified, and APK installed.
 echo APK: %APK%
 exit /b 0
