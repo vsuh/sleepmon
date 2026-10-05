@@ -117,6 +117,7 @@ object SyncHelper {
                 return@withExclusiveSppOperation false
             }
 
+            SyncHistory.record(context, pending.days)
             SyncQueue.clear(context)
             onStatus("═══ Xiaomi sync завершён: ${pending.days.size} дн.; очередь очищена")
             return@withExclusiveSppOperation true
