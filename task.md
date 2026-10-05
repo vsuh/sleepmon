@@ -156,6 +156,13 @@ Backend архитектурно готов к production deployment, но те�
 
 - `android_sync_app/build-release-install.bat` добавлен: последовательно выполняет `assembleRelease` → проверку `sleepmon.apk` через `apksigner` → `adb install -r`; при любой ошибке следующий шаг не запускается.
 
+## Логи httpx — убрать DEBUG 05.10.2026
+
+- `httpx` теперь имеет уровень `WARNING`, поэтому `DEBUG`-строки вроде `load_ssl_context ...` и `HTTP Request: GET ... 200 OK` не попадают в обычный лог приложения.
+- Удалён предыдущий filter, который специально переводил успешные HTTP-запросы `httpx` в `DEBUG`: теперь эти диагностические строки полностью скрыты.
+- Code commit: `ed0a384`.
+- Runtime-проверка после перезапуска контейнера ещё не выполнена.
+
 ## Web-сессия формы — таймаут 1 час 05.10.2026
 
 - Cookie `session_pin` теперь получает `max_age=3600` секунд и `SameSite=Lax` при успешном входе.
