@@ -29,21 +29,10 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-# httpx emits request lines at INFO, but successful REST requests are routine
-# diagnostics. Keep them available at DEBUG without lowering the global log
-# level for the rest of the application.
-class _HttpxRequestDebugFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        if record.name == "httpx" and record.levelno == logging.INFO and str(record.msg).startswith("HTTP Request:"):
-            record.levelno = logging.DEBUG
-            record.levelname = "DEBUG"
-        return True
-
-
-httpx_logger = logging.getLogger("httpx")
-httpx_logger.setLevel(logging.DEBUG)
-for _handler in logging.getLogger().handlers:
-    _handler.addFilter(_HttpxRequestDebugFilter())
+# httpx is intentionally quiet in the application log. Routine HTTP
+# diagnostics are not useful at INFO level, and DEBUG must not leak into
+# normal production logs.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 logger = logging.getLogger("sleepmon")
 
