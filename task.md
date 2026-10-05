@@ -65,6 +65,9 @@ Backend:
 - Формат дат: `7 окт.` с фиксированными русскими короткими названиями месяцев.
 - Code commit: e448247.
 
+- После изменения Android UI версия повышена с v82 до v83; новый build tag: v83 (05.10.2026).
+- Code commit: 724ab19.
+
 ## Android background sync — актуальное расследование 05.10.2026
 
 - Ручной Sync Now на v81 подтверждён end-to-end: Xiaomi SPP/auth → получение activity → /login HTTP 200 → /sync HTTP 200 → ACK файлов.
