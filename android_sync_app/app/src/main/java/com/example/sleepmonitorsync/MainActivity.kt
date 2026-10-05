@@ -22,8 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
@@ -108,14 +111,20 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
             var showSettings by remember { mutableStateOf(false) }
             var queue by remember { mutableStateOf<SyncQueue.Pending?>(null) }
+            var history by remember { mutableStateOf(SyncHistory.Snapshot(null, emptyList())) }
             val queueDateFormatter = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy") }
 
             suspend fun refreshQueue() {
                 queue = SyncQueue.load(context)
             }
 
+            suspend fun refreshHistory() {
+                history = SyncHistory.load(context)
+            }
+
             LaunchedEffect(Unit) {
                 refreshQueue()
+                refreshHistory()
             }
 
             if (showSettings) {
@@ -155,6 +164,16 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.padding(bottom = 16.dp),
                 )
 
+                Text(
+                    "Последняя успешная синхронизация: ${formatLastSuccessfulSync(history.lastSuccessfulSyncAt)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                SyncHistoryTable(history)
+
+                Spacer(modifier = Modifier.height(20.dp))
                 Text("Фоновая синхронизация запускается автоматически каждый час, даже если приложение закрыто.")
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -168,6 +187,7 @@ class MainActivity : ComponentActivity() {
                             }
                         } finally {
                             refreshQueue()
+                            refreshHistory()
                         }
                     }
                 }) {
@@ -323,4 +343,82 @@ private fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
     }
+}
+
+
+private val RUSSIAN_SHORT_MONTHS = listOf(
+    "янв.", "фев.", "мар.", "апр.", "май", "июн.",
+    "июл.", "авг.", "сен.", "окт.", "ноя.", "дек."
+)
+
+private fun formatLastSuccessfulSync(timestampMillis: Long?): String {
+    if (timestampMillis == null) return "нет данных"
+    val dateTime = Instant.ofEpochMilli(timestampMillis).atZone(ZoneId.systemDefault())
+    return "${dateTime.dayOfMonth} ${RUSSIAN_SHORT_MONTHS[dateTime.monthValue - 1]} ${"%02d".format(Locale.ROOT, dateTime.hour)}:${"%02d".format(Locale.ROOT, dateTime.minute)}"
+}
+
+private fun formatShortDate(date: LocalDate): String =
+    "${date.dayOfMonth} ${RUSSIAN_SHORT_MONTHS[date.monthValue - 1]}"
+
+private fun formatSleep(hours: Double): String {
+    if (hours <= 0.0) return "—"
+    val totalMinutes = (hours * 60.0).toInt()
+    return "${totalMinutes / 60}ч ${totalMinutes % 60}м"
+}
+
+private fun formatSteps(steps: Int): String =
+    if (steps > 0) String.format(Locale.ROOT, "%,d", steps).replace(",", " ") else "—"
+
+@Composable
+private fun SyncHistoryTable(history: SyncHistory.Snapshot) {
+    val byDate = history.days.associateBy { it.date }
+    val today = LocalDate.now()
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "Последние 7 дней",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            TableCell("Дата", 1.1f, true)
+            TableCell("Сон", 1.0f, true)
+            TableCell("Пульс", 0.9f, true)
+            TableCell("Во сне", 0.9f, true)
+            TableCell("Шаги", 1.2f, true)
+            TableCell("Проб.", 0.8f, true)
+        }
+
+        (0L..6L).forEach { offset ->
+            val date = today.minusDays(offset)
+            val day = byDate[date.toString()]
+            Row(modifier = Modifier.fillMaxWidth()) {
+                TableCell(formatShortDate(date), 1.1f)
+                TableCell(formatSleep(day?.sleepHours ?: 0.0), 1.0f)
+                TableCell(day?.pulseAvgDay?.takeIf { it > 0 }?.toString() ?: "—", 0.9f)
+                TableCell(day?.pulseAvgSleep?.takeIf { it > 0 }?.toString() ?: "—", 0.9f)
+                TableCell(day?.stepsTotal?.let(::formatSteps) ?: "—", 1.2f)
+                TableCell(day?.sleepAwakenings?.takeIf { it > 0 }?.toString() ?: "—", 0.8f)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.TableCell(
+    text: String,
+    weight: Float,
+    header: Boolean = false,
+) {
+    Text(
+        text = text,
+        modifier = Modifier
+            .weight(weight)
+            .padding(vertical = 5.dp, horizontal = 2.dp),
+        style = if (header) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
+        fontWeight = if (header) FontWeight.Bold else FontWeight.Normal,
+        maxLines = 1,
+    )
 }
