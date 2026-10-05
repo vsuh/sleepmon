@@ -47,6 +47,10 @@ for _handler in logging.getLogger().handlers:
 
 logger = logging.getLogger("sleepmon")
 
+# Web login session lifetime. The session cookie expires one hour after login;
+# after that the next form request is redirected back to /login.
+SESSION_MAX_AGE_SECONDS = 60 * 60
+
 NOTE_CACHE: dict[str, str] = {}
 
 def get_note_cached(date_str: str) -> str | None:
@@ -211,7 +215,13 @@ async def login_get(request: Request):
 async def login_post(request: Request, pin: str = Form(...)):
     if pin == APP_PIN:
         response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
-        response.set_cookie(key="session_pin", value=pin, httponly=True)
+        response.set_cookie(
+            key="session_pin",
+            value=pin,
+            max_age=SESSION_MAX_AGE_SECONDS,
+            httponly=True,
+            samesite="lax",
+        )
         return response
     return templates.TemplateResponse(request, "login.html", {"error": "Неверный PIN"})
 
@@ -326,7 +336,7 @@ async def save(request: Request,
                original_notes: str = Form(""),
                navigate: str = Form("save")):
     if not verify_session(request):
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     if not 0 <= sleep_quality <= 9:
         raise HTTPException(status_code=422, detail="sleep_quality must be between 0 and 9")
 
