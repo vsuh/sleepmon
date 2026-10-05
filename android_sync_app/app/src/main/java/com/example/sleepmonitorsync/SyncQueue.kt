@@ -148,3 +148,111 @@ object SyncQueue {
         }
     }
 }
+
+
+/**
+ * Local history of data that completed the full server-sync + band-ACK cycle.
+ * It is intentionally separate from the outbox: a successful sync clears the
+ * outbox, but the UI still needs the latest seven days for display.
+ */
+object SyncHistory {
+    data class Day(
+        val date: String,
+        val sleepHours: Double,
+        val pulseAvgDay: Int,
+        val pulseAvgSleep: Int,
+        val stepsTotal: Int,
+        val sleepAwakenings: Int,
+    )
+
+    data class Snapshot(
+        val lastSuccessfulSyncAt: Long?,
+        val days: List<Day>,
+    )
+
+    private const val FILE_NAME = "xiaomi_sync_history.json"
+    private const val MAX_HISTORY_DAYS = 30
+
+    suspend fun load(context: Context): Snapshot = withContext(Dispatchers.IO) {
+        synchronized(this@SyncHistory) {
+            readLocked(context)
+        }
+    }
+
+    suspend fun record(
+        context: Context,
+        successfulDays: List<SyncQueue.PendingDay>,
+        timestampMillis: Long = System.currentTimeMillis(),
+    ) = withContext(Dispatchers.IO) {
+        synchronized(this@SyncHistory) {
+            val old = readLocked(context)
+            val byDate = old.days.associateBy { it.date }.toMutableMap()
+            successfulDays.forEach { day ->
+                byDate[day.date] = Day(
+                    date = day.date,
+                    sleepHours = day.sleepHours,
+                    pulseAvgDay = day.pulseAvgDay,
+                    pulseAvgSleep = day.pulseAvgSleep,
+                    stepsTotal = day.stepsTotal,
+                    sleepAwakenings = day.sleepAwakenings,
+                )
+            }
+            val sorted = byDate.values.sortedByDescending { it.date }.take(MAX_HISTORY_DAYS)
+            writeLocked(context, Snapshot(timestampMillis, sorted))
+        }
+    }
+
+    private fun readLocked(context: Context): Snapshot {
+        val file = File(context.filesDir, FILE_NAME)
+        if (!file.exists()) return Snapshot(null, emptyList())
+        return try {
+            val root = JSONObject(file.readText())
+            val lastSuccessfulSyncAt = root.optLong("last_successful_sync_at", 0L).takeIf { it > 0L }
+            val daysJson = root.optJSONArray("days") ?: JSONArray()
+            val days = buildList {
+                for (i in 0 until daysJson.length()) {
+                    val d = daysJson.getJSONObject(i)
+                    add(
+                        Day(
+                            date = d.getString("date"),
+                            sleepHours = d.optDouble("sleep_hours", 0.0),
+                            pulseAvgDay = d.optInt("pulse_avg_day", 0),
+                            pulseAvgSleep = d.optInt("pulse_avg_sleep", 0),
+                            stepsTotal = d.optInt("steps_total", 0),
+                            sleepAwakenings = d.optInt("sleep_awakenings", 0),
+                        )
+                    )
+                }
+            }
+            Snapshot(lastSuccessfulSyncAt, days)
+        } catch (e: Exception) {
+            throw IllegalStateException("Cannot read Xiaomi sync history: ${e.message}", e)
+        }
+    }
+
+    private fun writeLocked(context: Context, snapshot: Snapshot) {
+        val target = File(context.filesDir, FILE_NAME)
+        val temp = File(context.filesDir, "$FILE_NAME.tmp")
+        val root = JSONObject()
+            .put("last_successful_sync_at", snapshot.lastSuccessfulSyncAt ?: 0L)
+        val daysJson = JSONArray()
+        snapshot.days.forEach { d ->
+            daysJson.put(
+                JSONObject()
+                    .put("date", d.date)
+                    .put("sleep_hours", d.sleepHours)
+                    .put("pulse_avg_day", d.pulseAvgDay)
+                    .put("pulse_avg_sleep", d.pulseAvgSleep)
+                    .put("steps_total", d.stepsTotal)
+                    .put("sleep_awakenings", d.sleepAwakenings)
+            )
+        }
+        root.put("days", daysJson)
+
+        temp.writeText(root.toString())
+        if (!temp.renameTo(target)) {
+            temp.delete()
+            throw IllegalStateException("Cannot atomically replace Xiaomi sync history")
+        }
+    }
+}
