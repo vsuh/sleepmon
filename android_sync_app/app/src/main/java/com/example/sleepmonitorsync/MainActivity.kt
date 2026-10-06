@@ -220,6 +220,8 @@ class MainActivity : ComponentActivity() {
                 Spacer(modifier = Modifier.height(32.dp))
             }
             }
+            }
+            }
         }
     }
 }
