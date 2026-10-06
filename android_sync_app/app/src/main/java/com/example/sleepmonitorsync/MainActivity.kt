@@ -136,6 +136,10 @@ class MainActivity : ComponentActivity() {
                 refreshWorkDiagnostics()
             }
 
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background,
+            ) {
             if (showSettings) {
                 SettingsScreen(
                     serverUrl = serverUrl,
@@ -146,10 +150,7 @@ class MainActivity : ComponentActivity() {
                     onAppPinChange = { appPin = it; prefs.edit().putString("appPin", it).apply() },
                     onBack = { showSettings = false },
                 )
-            } else Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background,
-            ) {
+            } else {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
