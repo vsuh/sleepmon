@@ -112,6 +112,7 @@ class MainActivity : ComponentActivity() {
             var showSettings by remember { mutableStateOf(false) }
             var queue by remember { mutableStateOf<SyncQueue.Pending?>(null) }
             var history by remember { mutableStateOf(SyncHistory.Snapshot(null, emptyList())) }
+            var workDiagnostics by remember { mutableStateOf<WorkManagerDiagnostics.Snapshot?>(null) }
             val queueDateFormatter = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy") }
 
             suspend fun refreshQueue() {
@@ -122,9 +123,14 @@ class MainActivity : ComponentActivity() {
                 history = SyncHistory.load(context)
             }
 
+            suspend fun refreshWorkDiagnostics() {
+                workDiagnostics = WorkManagerDiagnostics.load(context)
+            }
+
             LaunchedEffect(Unit) {
                 refreshQueue()
                 refreshHistory()
+                refreshWorkDiagnostics()
             }
 
             if (showSettings) {
@@ -165,10 +171,13 @@ class MainActivity : ComponentActivity() {
                 )
 
                 Text(
-                    "Последняя успешная синхронизация: ${formatLastSuccessfulSync(history.lastSuccessfulSyncAt)}",
+                    "Последняя успешная синхронизация: " + formatLastSuccessfulSync(history.lastSuccessfulSyncAt),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                WorkManagerDiagnosticsSection(workDiagnostics)
 
                 Spacer(modifier = Modifier.height(16.dp))
                 SyncHistoryTable(history, queue)
@@ -204,6 +213,55 @@ class MainActivity : ComponentActivity() {
                 )
 
                 Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkManagerDiagnosticsSection(snapshot: WorkManagerDiagnostics.Snapshot?) {
+    val info = snapshot?.workInfo
+    val lastRun = snapshot?.lastRun
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "Фоновая задача WorkManager",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text("Состояние: " + WorkManagerDiagnostics.stateLabel(info?.state))
+        Text(
+            "Следующий запуск: " +
+                if (info?.state == androidx.work.WorkInfo.State.ENQUEUED) {
+                    WorkManagerDiagnostics.formatTime(info.nextScheduleTimeMillis)
+                } else {
+                    "—"
+                }
+        )
+        Text("Попытка: " + (info?.runAttemptCount ?: "—"))
+        Text(
+            "Причина остановки: " +
+                if (info == null) "—" else WorkManagerDiagnostics.stopReasonLabel(
+                    if (android.os.Build.VERSION.SDK_INT >= 31) info.stopReason else null
+                )
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+        Text("Последний фактический запуск Worker:")
+        if (lastRun?.startedAt == null) {
+            Text("  ещё ни разу не запускался")
+        } else {
+            Text("  начало: " + WorkManagerDiagnostics.formatTime(lastRun.startedAt))
+            Text("  результат: " + WorkManagerDiagnostics.outcomeLabel(lastRun.outcome))
+            lastRun.finishedAt?.let {
+                Text("  завершение: " + WorkManagerDiagnostics.formatTime(it))
+            }
+            lastRun.stopReason?.let {
+                Text("  stop reason: " + WorkManagerDiagnostics.stopReasonLabel(it))
+            }
+            lastRun.detail?.takeIf { it.isNotBlank() }?.let {
+                Text("  детали: " + it)
             }
         }
     }
