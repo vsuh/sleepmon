@@ -10,8 +10,11 @@ SET "ADB=D:\bin\adb\adb.exe"
 SET "ver_f=app\src\main\java\com\example\sleepmonitorsync\AppVersion.kt"
 
 cd /d "%~dp0"
+
+echo [0/3] Get latest changes from GitHub
 git pull
 
+echo.
 echo [1/3] Building signed release APK...
 call gradlew.bat assembleRelease
 if errorlevel 1 (
