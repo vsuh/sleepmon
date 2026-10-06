@@ -298,3 +298,15 @@ Backend архитектурно готов к production deployment, но те�
 5. Пульс сна больше не `0`, если в `HrHistory` есть ночные HR samples.
 6. После полного `server /sync + ACK` меняются и timestamp последней успешной синхронизации, и её возраст.
 7. Для следующей проверки обязательно указывать build tag **v89**.
+## Исправление compileRelease Kotlin после v89 — v90 (06.10.2026)
+
+Сборка v89 выявила синтаксическую ошибку в `MainActivity.kt`: при добавлении общего `Surface` были потеряны две закрывающие `}`. Из-за этого компилятор считал `SettingsScreen`, `WorkManagerDiagnosticsSection`, `SyncHistoryTable`, `TableCell` и другие функции локальными, что породило каскад `Unresolved reference` и `private is not applicable to local function`.
+
+- В `MainActivity.kt` восстановлена полная структура `Surface → if/else → Column → SleepMonitorSyncTheme → setContent → onCreate → MainActivity`.
+- AppVersion повышена с v89 до **v90**.
+- Исправление коммитом `f7e4b9a`; версия — `b437680`.
+- Предыдущие функциональные исправления v89 не менялись.
+
+### Следующая проверка
+
+Сначала снова выполнить `build-release-install.bat`. Ожидается успешный `compileReleaseKotlin`; SDK XML warning версии 4 остаётся отдельным warning и не является причиной текущей ошибки. После успешной установки проверять уже **v90**.
