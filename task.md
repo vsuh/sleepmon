@@ -263,3 +263,14 @@ Backend архитектурно готов к production deployment, но те�
 3. Обновить production HELOR до проверенного commit.
 4. Проверить release signing через внешний `_secrets/sleepmon-apk`, собрать подписанный release APK и провести финальный E2E.
 5. После успешного E2E считать конфигурацию готовой к эксплуатации.
+
+## Исправление release-компиляции Android — v87 (06.10.2026)
+
+- Локальная release-сборка v86 остановилась на трёх ошибках Kotlin-компилятора.
+- SyncHelper.postToServer() исправлен: результат withContext(...) теперь явно возвращается из функции (return withContext(...)).
+- Из SyncWorker удалён override onStopped(): в используемой версии CoroutineWorker этот метод final, поэтому переопределение не компилируется. Persistent-диагностика запуска/завершения Worker через doWork() остаётся без изменений.
+- WorkManagerDiagnostics.stateLabel() дополнен веткой WorkInfo.State.CANCELLED, чтобы when был исчерпывающим.
+- AppVersion повышен с v86 до v87.
+- Коммиты: 39b49ed (SyncHelper), 5550e76 (SyncWorker), 7d40fc6 (WorkManagerDiagnostics), 78ab9d2 (v87).
+- Предупреждение SDK XML version 4 vs 3 из лога сборки не является причиной падения компиляции; его можно рассмотреть отдельно после успешной сборки.
+- Следующая проверка: повторно запустить локальный build-release-install.bat / assembleRelease и прислать лог, если появится новая ошибка.
