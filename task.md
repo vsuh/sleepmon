@@ -333,3 +333,23 @@ Backend архитектурно готов к production deployment, но те�
 ### Следующая проверка v91
 
 После локальной сборки и установки v91 проверить Logcat на строку `sleep duration source=bed..wake` и серверный `/sync`: для этой ночи ожидается длительность, близкая к фактическому `wakeup - bedTime` (около 7.6 ч), а не 2.3 ч.
+
+
+## Исправление release-компиляции после v91 — v92 (06.10.2026)
+
+Локальная release-сборка после v91 остановилась на синтаксической ошибке в SyncHelper.kt внутри BandDayAggregate(...).
+
+- Вызов содержал лишнюю строку `sleepAwakenings = sleep?.wakeCount ?: 0,?.div(60.0) ?: 0.0,`, оставшуюся после правки расчёта `sleepHours`.
+- Из-за этого Kotlin дополнительно выдавал каскад ошибок `Too many arguments`, `Unresolved reference div`, `Unresolved reference sleepAwakenings` и `Return type mismatch`.
+- Удалена только ошибочная строка; корректное `sleepAwakenings = sleep?.wakeCount ?: 0` сохранено.
+- Логика v91 расчёта `sleepHours` через `bedTime → wakeupTime` не изменена.
+- AppVersion повышена с v91 до **v92**.
+- Commit версии: `cf4c5a7`.
+- APK в рабочем контейнере не собирался; следующая проверка выполняется локально через `build-release-install.bat`.
+
+### Следующая проверка v92
+
+1. Повторно запустить `build-release-install.bat`.
+2. Убедиться, что `compileReleaseKotlin` проходит.
+3. После установки проверить Logcat `sleep duration source=bed..wake`.
+4. Проверить серверный `/sync`: ожидается sleep около фактического окна сна (~7.6 ч), а не 2.3 ч.
