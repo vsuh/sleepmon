@@ -578,7 +578,11 @@ async def sync_endpoint(request: Request,
         return JSONResponse({
             "status": "ok",
             "date": date,
+            "sleep_hours": saved["sleep_hours"],
+            "pulse_avg_day": saved["pulse_avg_day"],
+            "pulse_avg_sleep": saved["pulse_avg_sleep"],
             "steps_total": saved["steps_total"],
+            "sleep_awakenings": saved["sleep_awakenings"],
         })
     else:
         logger.error(f"❌ /sync: failed to save note for {date} to Obsidian")
