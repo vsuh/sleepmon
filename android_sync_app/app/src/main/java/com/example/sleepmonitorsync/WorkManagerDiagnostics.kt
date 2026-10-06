@@ -153,6 +153,7 @@ object WorkManagerDiagnostics {
         WorkInfo.State.SUCCEEDED -> "SUCCEEDED"
         WorkInfo.State.FAILED -> "FAILED"
         WorkInfo.State.BLOCKED -> "BLOCKED"
+        WorkInfo.State.CANCELLED -> "CANCELLED"
     }
 
     private fun loadLastRun(context: Context): LastRun {
