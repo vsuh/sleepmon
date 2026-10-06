@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
@@ -34,6 +35,7 @@ import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import com.example.sleepmonitorsync.band.BandCredentials
+import com.example.sleepmonitorsync.theme.SleepMonitorSyncTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -108,6 +110,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
+            SleepMonitorSyncTheme {
             val context = LocalContext.current
             var showSettings by remember { mutableStateOf(false) }
             var queue by remember { mutableStateOf<SyncQueue.Pending?>(null) }
@@ -143,9 +146,10 @@ class MainActivity : ComponentActivity() {
                     onAppPinChange = { appPin = it; prefs.edit().putString("appPin", it).apply() },
                     onBack = { showSettings = false },
                 )
-                return@setContent
-            }
-
+            } else Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background,
+            ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -214,6 +218,7 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.height(32.dp))
             }
+            }
         }
     }
 }
@@ -230,18 +235,19 @@ private fun WorkManagerDiagnosticsSection(snapshot: WorkManagerDiagnostics.Snaps
             fontWeight = FontWeight.Bold,
         )
         Spacer(modifier = Modifier.height(6.dp))
-        Text("Состояние: " + WorkManagerDiagnostics.stateLabel(info?.state))
+        Text("Состояние задачи: " + WorkManagerDiagnostics.stateLabel(info?.state))
         Text(
             "Следующий запуск: " +
                 if (info?.state == androidx.work.WorkInfo.State.ENQUEUED) {
-                    WorkManagerDiagnostics.formatTime(info.nextScheduleTimeMillis)
+                    WorkManagerDiagnostics.formatTime(info.nextScheduleTimeMillis) +
+                        " (" + WorkManagerDiagnostics.formatDelay(info.nextScheduleTimeMillis) + ")"
                 } else {
                     "—"
                 }
         )
         Text("Попытка: " + (info?.runAttemptCount ?: "—"))
         Text(
-            "Причина остановки: " +
+            "Остановка: " +
                 if (info == null) "—" else WorkManagerDiagnostics.stopReasonLabel(
                     if (android.os.Build.VERSION.SDK_INT >= 31) info.stopReason else null
                 )
@@ -412,7 +418,14 @@ private val RUSSIAN_SHORT_MONTHS = listOf(
 private fun formatLastSuccessfulSync(timestampMillis: Long?): String {
     if (timestampMillis == null) return "нет данных"
     val dateTime = Instant.ofEpochMilli(timestampMillis).atZone(ZoneId.systemDefault())
-    return "${dateTime.dayOfMonth} ${RUSSIAN_SHORT_MONTHS[dateTime.monthValue - 1]} ${"%02d".format(Locale.ROOT, dateTime.hour)}:${"%02d".format(Locale.ROOT, dateTime.minute)}"
+    val stamp = "${dateTime.dayOfMonth} ${RUSSIAN_SHORT_MONTHS[dateTime.monthValue - 1]} ${"%02d".format(Locale.ROOT, dateTime.hour)}:${"%02d".format(Locale.ROOT, dateTime.minute)}"
+    val ageMinutes = ((System.currentTimeMillis() - timestampMillis) / 60000L).coerceAtLeast(0L)
+    val age = when {
+        ageMinutes < 60L -> "${ageMinutes}м назад"
+        ageMinutes < 1440L -> "${ageMinutes / 60L}ч ${ageMinutes % 60L}м назад"
+        else -> "${ageMinutes / 1440L}д ${((ageMinutes % 1440L) / 60L)}ч назад"
+    }
+    return "$stamp ($age)"
 }
 
 private fun formatShortDate(date: LocalDate): String =
