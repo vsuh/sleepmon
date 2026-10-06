@@ -171,7 +171,7 @@ class MainActivity : ComponentActivity() {
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
-                SyncHistoryTable(history)
+                SyncHistoryTable(history, queue)
 
                 Spacer(modifier = Modifier.height(20.dp))
                 Text("Фоновая синхронизация запускается автоматически каждый час, даже если приложение закрыто.")
@@ -369,9 +369,24 @@ private fun formatSleep(hours: Double): String {
 private fun formatSteps(steps: Int): String =
     if (steps > 0) String.format(Locale.ROOT, "%,d", steps).replace(",", " ") else "—"
 
+private data class DisplayDay(
+    val sleepHours: Double,
+    val pulseAvgDay: Int,
+    val pulseAvgSleep: Int,
+    val stepsTotal: Int,
+    val sleepAwakenings: Int,
+)
+
 @Composable
-private fun SyncHistoryTable(history: SyncHistory.Snapshot) {
-    val byDate = history.days.associateBy { it.date }
+private fun SyncHistoryTable(history: SyncHistory.Snapshot, pending: SyncQueue.Pending?) {
+    val byDate = history.days.associate {
+        it.date to DisplayDay(it.sleepHours, it.pulseAvgDay, it.pulseAvgSleep, it.stepsTotal, it.sleepAwakenings)
+    }.toMutableMap()
+    pending?.days?.forEach { day ->
+        byDate[day.date] = DisplayDay(
+            day.sleepHours, day.pulseAvgDay, day.pulseAvgSleep, day.stepsTotal, day.sleepAwakenings
+        )
+    }
     val today = LocalDate.now()
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -399,7 +414,7 @@ private fun SyncHistoryTable(history: SyncHistory.Snapshot) {
                 TableCell(formatSleep(day?.sleepHours ?: 0.0), 1.0f)
                 TableCell(day?.pulseAvgDay?.takeIf { it > 0 }?.toString() ?: "—", 0.9f)
                 TableCell(day?.pulseAvgSleep?.takeIf { it > 0 }?.toString() ?: "—", 0.9f)
-                TableCell(day?.stepsTotal?.let(::formatSteps) ?: "—", 1.2f)
+                TableCell(day?.stepsTotal?.takeIf { it > 0 }?.let(::formatSteps) ?: "—", 1.2f)
                 TableCell(day?.sleepAwakenings?.takeIf { it > 0 }?.toString() ?: "—", 0.8f)
             }
         }
