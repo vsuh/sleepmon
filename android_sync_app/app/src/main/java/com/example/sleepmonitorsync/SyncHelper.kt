@@ -532,7 +532,7 @@ object SyncHelper {
         stepsTotal: Int,
         sleepAwakenings: Int
     ): ServerSyncResult {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val client = OkHttpClient.Builder()
                     .connectTimeout(FALLBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
