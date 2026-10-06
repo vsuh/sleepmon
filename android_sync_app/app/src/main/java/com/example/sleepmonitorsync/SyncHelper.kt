@@ -244,7 +244,30 @@ object SyncHelper {
                 stepsTotal = stepsTotal,
                 pulseAvgDay = pulse,
                 pulseAvgSleep = sleepPulse,
-                sleepHours = sleep?.sleepDurationMinutes?.div(60.0) ?: 0.0,
+                // The Xiaomi type=16 summary duration may cover only detected sleep stages.
+                // The file header's bedTime/wakeupTime represents the actual sleep session window.
+                // Prefer that window and keep the summary duration only as a fallback for invalid timestamps.
+                sleepHours = sleep?.let {
+                    val bedWakeMinutes = if (it.wakeupTimeSeconds > it.bedTimeSeconds) {
+                        (it.wakeupTimeSeconds.toLong() - it.bedTimeSeconds.toLong()) / 60L
+                    } else {
+                        0L
+                    }
+                    val durationMinutes = if (bedWakeMinutes > 0L) {
+                        bedWakeMinutes
+                    } else {
+                        it.sleepDurationMinutes.toLong().coerceAtLeast(0L)
+                    }
+                    VersionedLog.i(
+                        TAG,
+                        "📊 $date: sleep duration source=" +
+                            (if (bedWakeMinutes > 0L) "bed..wake" else "summary") +
+                            ", bedWake=" + bedWakeMinutes + "m, summary=" +
+                            it.sleepDurationMinutes + "m, used=" + durationMinutes + "m"
+                    )
+                    durationMinutes / 60.0
+                } ?: 0.0,
+                sleepAwakenings = sleep?.wakeCount ?: 0,?.div(60.0) ?: 0.0,
                 sleepAwakenings = sleep?.wakeCount ?: 0,
             )
         }

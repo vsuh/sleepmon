@@ -310,3 +310,26 @@ Backend архитектурно готов к production deployment, но те�
 ### Следующая проверка
 
 Сначала снова выполнить `build-release-install.bat`. Ожидается успешный `compileReleaseKotlin`; SDK XML warning версии 4 остаётся отдельным warning и не является причиной текущей ошибки. После успешной установки проверять уже **v90**.
+
+## Исправление длительности сна Xiaomi — v91 (06.10.2026)
+
+Реальный серверный лог после установки v90 показал, что Android успешно дошёл до `/sync` и получил HTTP 200/подтверждение сохранения, но отправил `sleep=2.3h`, тогда как на браслете длительность была около 7.6 ч.
+
+Причина найдена в новом Xiaomi-пути `SyncHelper.aggregateBandSamples()`: для `sleepHours` использовалось поле `SleepSummary.sleepDurationMinutes`, которое берётся из `type=16` summary-пакета. В конкретном случае этот summary дал 138 минут. При этом тот же sleep-файл содержит `bedTimeSeconds` и `wakeupTimeSeconds`, то есть фактическое окно сессии.
+
+Исправление:
+- для Xiaomi `sleepHours` теперь вычисляется как `(wakeupTimeSeconds - bedTimeSeconds) / 60`;
+- значение `sleepDurationMinutes` из summary используется только как fallback, если timestamps некорректны;
+- добавлен INFO-лог источника длительности: `bed..wake` или `summary`, с `bedWake`, `summary` и фактически использованным значением;
+- secure SPP и парсинг протокола не менялись;
+- AppVersion повышена с v90 до **v91**.
+
+Коммиты:
+- `1daa2bf` — исправление источника длительности Xiaomi sleep;
+- `c5086a8` — v91.
+
+Лог сервера также подтвердил, что `/sync` завершился успешно (`200 OK`, note saved and verified), поэтому проблема не в ACK/server sync, а именно в значении `sleep_hours`, которое формировал Android.
+
+### Следующая проверка v91
+
+После локальной сборки и установки v91 проверить Logcat на строку `sleep duration source=bed..wake` и серверный `/sync`: для этой ночи ожидается длительность, близкая к фактическому `wakeup - bedTime` (около 7.6 ч), а не 2.3 ч.
