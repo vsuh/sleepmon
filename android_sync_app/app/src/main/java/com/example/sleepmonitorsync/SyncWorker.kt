@@ -76,11 +76,6 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
         }
     }
 
-    override fun onStopped() {
-        val stopReason = if (android.os.Build.VERSION.SDK_INT >= 31) getStopReason() else null
-        WorkManagerDiagnostics.recordStopped(applicationContext, id, stopReason)
-        super.onStopped()
-    }
 
     companion object {
         private val TAG = AppVersion.logTag("SyncWorker")
