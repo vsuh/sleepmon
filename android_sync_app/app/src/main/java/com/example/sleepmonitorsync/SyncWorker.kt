@@ -58,8 +58,9 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
             )
             result
         } else {
-            // WorkManager will retry transient Bluetooth/network/server failures.
-            val result = Result.retry()
+            // Do not turn a periodic sync failure into an exponential backoff retry.
+            // The persistent queue keeps the data, and the next hourly periodic run will retry.
+            val result = Result.failure()
             WorkManagerDiagnostics.recordFinished(
                 applicationContext, workId, WorkManagerDiagnostics.Outcome.RETRY
             )
