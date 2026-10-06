@@ -267,7 +267,6 @@ object SyncHelper {
                     )
                     durationMinutes / 60.0
                 } ?: 0.0,
-                sleepAwakenings = sleep?.wakeCount ?: 0,?.div(60.0) ?: 0.0,
                 sleepAwakenings = sleep?.wakeCount ?: 0,
             )
         }
