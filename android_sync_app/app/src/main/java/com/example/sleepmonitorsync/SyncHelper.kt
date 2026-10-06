@@ -218,11 +218,21 @@ object SyncHelper {
             val sleepPulse = sleep?.pulseAvgSleep?.takeIf { it > 0 } ?: if (sleep != null) {
                 val sleepStart = sleep.bedTimeSeconds.toLong()
                 val wakeTime = sleep.wakeupTimeSeconds.toLong()
-                unique.asSequence()
+                val historyHr = hrHistory.hr.entries
+                    .asSequence()
+                    .filter { it.key.toLong() >= sleepStart && it.key.toLong() < wakeTime }
+                    .map { it.value }
+                    .filter { it in 30..220 }
+                    .toList()
+                val currentHr = unique.asSequence()
                     .filter { it.timestampSeconds.toLong() >= sleepStart && it.timestampSeconds.toLong() < wakeTime }
                     .mapNotNull { it.heartRate?.takeIf { bpm -> bpm > 0 } }
                     .toList()
-                    .let { values -> if (values.isNotEmpty()) values.average().toInt() else 0 }
+                when {
+                    historyHr.size >= 3 -> historyHr.average().toInt()
+                    currentHr.isNotEmpty() -> currentHr.average().toInt()
+                    else -> 0
+                }
             } else {
                 0
             }
@@ -462,8 +472,9 @@ object SyncHelper {
             if (longest != null) {
                 sleepStart = longest.startTime
                 wakeTime = longest.endTime
-                sleepHours = (longest.endTime.toEpochMilli() - longest.startTime.toEpochMilli()) / 3600000.0
-                VersionedLog.d(TAG, "  ✓ Sleep: $sleepHours hours (${sleepRecords.size} sessions, wake time: $wakeTime)")
+                val bedWakeMinutes = ((longest.endTime.toEpochMilli() - longest.startTime.toEpochMilli()) / 60000L).toInt()
+                sleepHours = bedWakeMinutes / 60.0
+                VersionedLog.d(TAG, "  ✓ Sleep session: $sleepHours hours (${sleepRecords.size} sessions, wake time: $wakeTime)")
 
                 sleepAwakenings = countSleepAwakenings(longest)
                 VersionedLog.d(TAG, "  ✓ Sleep awakenings: $sleepAwakenings")

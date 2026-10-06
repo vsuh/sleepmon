@@ -112,6 +112,16 @@ object WorkManagerDiagnostics {
         }.getOrDefault("—")
     }
 
+    fun formatDelay(timestampMillis: Long): String {
+        val minutes = ((timestampMillis - System.currentTimeMillis()) / 60000L)
+        if (minutes <= 0L) return "время уже наступило"
+        return when {
+            minutes < 60L -> "через ${minutes}м"
+            minutes < 1440L -> "через ${minutes / 60L}ч ${minutes % 60L}м"
+            else -> "через ${minutes / 1440L}д ${((minutes % 1440L) / 60L)}ч"
+        }
+    }
+
     fun outcomeLabel(outcome: Outcome?): String = when (outcome) {
         null -> "нет данных"
         Outcome.STARTED -> "запущен, завершение не зафиксировано"
@@ -125,7 +135,7 @@ object WorkManagerDiagnostics {
     fun stopReasonLabel(reason: Int?): String {
         if (reason == null) return "нет данных"
         return when (reason) {
-            WorkInfo.STOP_REASON_NOT_STOPPED -> "не остановлен"
+            WorkInfo.STOP_REASON_NOT_STOPPED -> "нет — задача не остановлена"
             WorkInfo.STOP_REASON_CANCELLED_BY_APP -> "отменён приложением"
             WorkInfo.STOP_REASON_PREEMPT -> "вытеснен другим заданием"
             WorkInfo.STOP_REASON_TIMEOUT -> "таймаут"
