@@ -19,6 +19,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
+import org.json.JSONObject
 import com.example.sleepmonitorsync.band.BandCredentials
 import com.example.sleepmonitorsync.band.XiaomiBandClassicConnection
 import com.example.sleepmonitorsync.band.activity.ActivitySample
@@ -106,10 +107,19 @@ object SyncHelper {
             }
 
             val (activeUrl, cookie) = resolveActiveServer(primaryUrl, backupUrl, pin, onStatus)
+            val successfulDays = mutableListOf<SyncQueue.PendingDay>()
             for (day in pending.days.sortedBy { it.date }) {
-                postToServer(activeUrl, cookie, day.date, day.sleepHours, day.pulseAvgDay,
+                val saved = postToServer(activeUrl, cookie, day.date, day.sleepHours, day.pulseAvgDay,
                     day.pulseAvgSleep, day.stepsTotal, day.sleepAwakenings)
-                onStatus("✅ ${day.date}: шаги ${day.stepsTotal}, пульс ${day.pulseAvgDay}")
+                successfulDays += SyncQueue.PendingDay(
+                    date = saved.date,
+                    sleepHours = saved.sleepHours,
+                    pulseAvgDay = saved.pulseAvgDay,
+                    pulseAvgSleep = saved.pulseAvgSleep,
+                    stepsTotal = saved.stepsTotal,
+                    sleepAwakenings = saved.sleepAwakenings,
+                )
+                onStatus("✅ ${day.date}: шаги ${saved.stepsTotal}, пульс ${saved.pulseAvgDay}")
             }
 
             if (!connection.acknowledgeFileIds(pending.fileIds)) {
@@ -117,7 +127,7 @@ object SyncHelper {
                 return@withExclusiveSppOperation false
             }
 
-            SyncHistory.record(context, pending.days)
+            SyncHistory.record(context, successfulDays)
             SyncQueue.clear(context)
             onStatus("═══ Xiaomi sync завершён: ${pending.days.size} дн.; очередь очищена")
             return@withExclusiveSppOperation true
@@ -503,6 +513,15 @@ object SyncHelper {
      * and never touches alco/notes/well_being — those are user-owned fields that
      * only the web form's manual "Сохранить" (/save) is allowed to change.
      */
+    private data class ServerSyncResult(
+        val date: String,
+        val sleepHours: Double,
+        val pulseAvgDay: Int,
+        val pulseAvgSleep: Int,
+        val stepsTotal: Int,
+        val sleepAwakenings: Int,
+    )
+
     private suspend fun postToServer(
         baseUrl: String,
         cookie: String,
@@ -512,7 +531,7 @@ object SyncHelper {
         hrSleep: Int,
         stepsTotal: Int,
         sleepAwakenings: Int
-    ) {
+    ): ServerSyncResult {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val client = OkHttpClient.Builder()
@@ -541,7 +560,16 @@ object SyncHelper {
 
                 if (syncResp.isSuccessful) {
                     val responseBody = syncResp.body?.string().orEmpty()
+                    val json = JSONObject(responseBody)
                     VersionedLog.i(TAG, "✅ Server accepted data for $date (HTTP ${syncResp.code})")
+                    return@withContext ServerSyncResult(
+                        date = json.getString("date"),
+                        sleepHours = json.getDouble("sleep_hours"),
+                        pulseAvgDay = json.getInt("pulse_avg_day"),
+                        pulseAvgSleep = json.getInt("pulse_avg_sleep"),
+                        stepsTotal = json.getInt("steps_total"),
+                        sleepAwakenings = json.getInt("sleep_awakenings"),
+                    )
                 } else {
                     throw Exception("Server returned HTTP ${syncResp.code}")
                 }
