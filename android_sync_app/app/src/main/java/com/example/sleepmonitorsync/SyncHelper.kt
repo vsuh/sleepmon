@@ -182,9 +182,20 @@ object SyncHelper {
             Instant.ofEpochSecond(it.timestampSeconds.toLong()).atZone(ZoneId.systemDefault()).toLocalDate()
         }
         // Sleep belongs to the local date on which the user woke up.
-        val sleepByDay = sleepSummaries.associateBy {
-            Instant.ofEpochSecond(it.wakeupTimeSeconds.toLong()).atZone(ZoneId.systemDefault()).toLocalDate()
-        }
+        // A day can contain several Xiaomi sleep files (for example the main night
+        // plus a short nap). Keep the longest session for that wake-up date so a short
+        // nap cannot overwrite the main night's duration, pulse, or awakenings.
+        val sleepByDay = sleepSummaries
+            .groupBy {
+                Instant.ofEpochSecond(it.wakeupTimeSeconds.toLong()).atZone(ZoneId.systemDefault()).toLocalDate()
+            }
+            .mapValues { (_, sessions) ->
+                sessions.maxByOrNull { session ->
+                    val bed = session.bedTimeSeconds.toLong()
+                    val wake = session.wakeupTimeSeconds.toLong()
+                    if (wake > bed) wake - bed else session.sleepDurationMinutes.toLong().coerceAtLeast(0L) * 60L
+                }!!
+            }
         // A daily summary is an authoritative whole-day step counter. Some real band
         // syncs provide a summary file even when the per-minute details contain no
         // usable step samples, so include summary-only dates and use summary.steps as
