@@ -56,7 +56,7 @@ if not exist "%BUILD_TOOLS%\apksigner.bat" (
     exit /b 1
 )
 
-call "%BUILD_TOOLS%\apksigner.bat" verify --verbose "%APK%"
+call "%BUILD_TOOLS%\apksigner.bat" verify --verbose "%APK%" | findstr /C:": true" /C:"signers:"
 if errorlevel 1 (
     echo.
     echo ERROR: APK signature verification failed.
