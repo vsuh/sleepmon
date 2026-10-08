@@ -1,0 +1,2 @@
+mi-fitness-data-bridge==0.3.3
+python-dotenv>=1.0,<2.0
