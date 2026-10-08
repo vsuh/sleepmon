@@ -1,2 +1,2 @@
-mi-fitness-data-bridge==0.3.3
+git+https://github.com/shkyyy18/mi_fitness_data_bridge.git@v0.3.3
 python-dotenv>=1.0,<2.0
