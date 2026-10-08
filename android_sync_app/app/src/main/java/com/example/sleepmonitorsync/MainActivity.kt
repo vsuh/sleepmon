@@ -38,6 +38,8 @@ import com.example.sleepmonitorsync.band.BandCredentials
 import com.example.sleepmonitorsync.theme.SleepMonitorSyncTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -131,9 +133,12 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(Unit) {
-                refreshQueue()
-                refreshHistory()
-                refreshWorkDiagnostics()
+                while (isActive) {
+                    refreshQueue()
+                    refreshHistory()
+                    refreshWorkDiagnostics()
+                    delay(2000L)
+                }
             }
 
             Surface(
@@ -188,10 +193,7 @@ class MainActivity : ComponentActivity() {
                 SyncHistoryTable(history, queue)
 
                 Spacer(modifier = Modifier.height(20.dp))
-                Text("Фоновая синхронизация запускается автоматически каждый час, даже если приложение закрыто.")
-
                 Spacer(modifier = Modifier.height(16.dp))
-
                 Button(onClick = {
                     CoroutineScope(Dispatchers.Main).launch {
                         status = "Синхронизация с Xiaomi Band..."
