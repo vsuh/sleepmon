@@ -441,3 +441,24 @@ Commit версии: b335c8c.
 - AppVersion повышена с v94 до v95.
 - Code commits: fcf18778bd8e33dae68ed7b50f019bc52d566a38 (перестановка UI), a57f6447fe3e5f3cd6c46dd7106920e6903dac33 (v95).
 - APK в рабочем контейнере не собирался; следующая проверка выполняется локально через `build-release-install.bat`.
+
+
+## Xiaomi Cloud probe — исправление диагностики и актуализация upstream (08.10.2026)
+
+- Разобран реальный результат предыдущего запуска: MiFitnessAuthenticationError с отсутствующими passToken/userId/ssecurity — это первичная ошибка авторизации, а последующий RuntimeError: client not initialized возникал потому, что probe игнорировал connect() == False и продолжал работу после того, как upstream сам закрыл HTTP client.
+- В tools/xiaomi_cloud_probe/probe.py теперь явно проверяется результат adapter.connect(). При неуспешном подключении исходный adapter.last_error записывается в локальный sleep_cloud.json как connect_error, после чего probe завершается без вторичной ложной ошибки.
+- Важно: connect_error не содержит passToken и probe по-прежнему не выводит секреты.
+- Обновлена зависимость mi_fitness_data_bridge: вместо старого v0.3.3 probe теперь использует текущий upstream main, зафиксированный точным SHA ae70f5e6e167474e93d4c2beeb8ae3d3297d5ade.
+- Этот upstream содержит более новые исправления Xiaomi login после v0.3.3, включая безопасную обработку неполного ответа, проверку auth-полей/redirect и отсутствие утечки credential-bearing URL в ошибках. Сам факт наличия этих исправлений не доказывает, что текущий Xiaomi аккаунт выдаст ssecurity; это проверит только новый локальный запуск.
+- Code commits:
+  - 5e6a16c9e18a140429dd6804312f5d64ecf3ad28 — явная обработка неуспешного Cloud connect;
+  - 45551e0579377170166f81477a0111421aeff2f3 — pin актуального upstream по SHA.
+- APK/Android-код не менялись; AppVersion повышать не требуется.
+
+### Следующая проверка Cloud probe
+
+1. В каталоге tools/xiaomi_cloud_probe выполнить python -m pip install -r requirements.txt.
+2. Оставить текущие локальные .env с XIAOMI_USER_ID, XIAOMI_PASS_TOKEN, XIAOMI_REGION; секреты в чат не присылать.
+3. Запустить probe для 2026-10-06..2026-10-08: python probe.py --start 2026-10-06 --end 2026-10-08.
+4. Прислать только содержимое sleep_cloud.json без .env.
+5. Теперь при auth failure мы должны увидеть именно причину connect_error; если login пройдёт, probe дойдёт до raw_records/sessions, и тогда можно будет установить, есть ли сон в Xiaomi Cloud.
