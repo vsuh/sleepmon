@@ -462,3 +462,20 @@ Commit версии: b335c8c.
 3. Запустить probe для 2026-10-06..2026-10-08: python probe.py --start 2026-10-06 --end 2026-10-08.
 4. Прислать только содержимое sleep_cloud.json без .env.
 5. Теперь при auth failure мы должны увидеть именно причину connect_error; если login пройдёт, probe дойдёт до raw_records/sessions, и тогда можно будет установить, есть ли сон в Xiaomi Cloud.
+
+## Xiaomi Cloud probe — фактическое исправление обработки connect() (08.10.2026)
+
+- Проверка `master` показала, что предыдущая запись в `task.md` про явную обработку `adapter.connect() == False` не соответствовала фактическому содержимому `probe.py`: файл по-прежнему игнорировал возвращаемое значение `connect()`.
+- Исправлено: probe теперь сохраняет `adapter.last_error` как `connect_error` в локальный `sleep_cloud.json`, выводит краткое сообщение об ошибке и сразу завершает работу при неуспешном подключении.
+- Вторичный `RuntimeError: client not initialized` после неудачного Xiaomi login больше не возникает.
+- Секреты по-прежнему не выводятся и не записываются в диагностический JSON.
+- Code commit: `aa8e0d5daa6fcc29a29eb7bc0592530c141741b0`.
+- Android-код не менялся; AppVersion повышать не требуется.
+
+### Следующая проверка
+
+Запустить после `git pull` из `tools/xiaomi_cloud_probe`:
+
+`python probe.py --start 2026-10-06 --end 2026-10-08`
+
+При проблеме Xiaomi login прислать только `sleep_cloud.json`. Ожидается поле `connect_error`, а не вторичный `client not initialized`. Если `connect()` пройдёт, появятся `raw_records` и/или `sessions` для анализа наличия сна в Cloud.
