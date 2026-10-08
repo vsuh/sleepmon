@@ -180,20 +180,9 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.padding(bottom = 16.dp),
                 )
 
-                Text(
-                    "Последняя успешная синхронизация: " + formatLastSuccessfulSync(history.lastSuccessfulSyncAt),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-                WorkManagerDiagnosticsSection(workDiagnostics)
-
-                Spacer(modifier = Modifier.height(16.dp))
                 SyncHistoryTable(history, queue)
 
                 Spacer(modifier = Modifier.height(20.dp))
-                Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = {
                     CoroutineScope(Dispatchers.Main).launch {
                         status = "Синхронизация с Xiaomi Band..."
@@ -218,6 +207,16 @@ class MainActivity : ComponentActivity() {
                     pending = queue,
                     dateFormatter = queueDateFormatter,
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "Последняя успешная синхронизация: " + formatLastSuccessfulSync(history.lastSuccessfulSyncAt),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                WorkManagerDiagnosticsSection(workDiagnostics)
 
                 Spacer(modifier = Modifier.height(32.dp))
             }
