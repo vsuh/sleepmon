@@ -57,7 +57,17 @@ async def main() -> None:
         "raw_records": [],
     }
 
-    await adapter.connect()
+    connected = await adapter.connect()
+    if not connected:
+        output["connect_error"] = adapter.last_error or "Xiaomi Cloud connection failed"
+        out_path = BASE_DIR / "sleep_cloud.json"
+        out_path.write_text(
+            json.dumps(output, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+        )
+        print(f"Cloud probe connection failed: {output['connect_error']}")
+        print(f"Saved diagnostic result to {out_path}")
+        return
+
     try:
         # Keep the raw cloud response as a diagnostic artifact, but never
         # serialize credentials or the adapter itself.
