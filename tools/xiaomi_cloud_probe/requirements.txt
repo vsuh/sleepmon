@@ -1,2 +1,2 @@
-git+https://github.com/shkyyy18/mi_fitness_data_bridge.git@v0.3.3
+git+https://github.com/shkyyy18/mi_fitness_data_bridge.git@ae70f5e6e167474e93d4c2beeb8ae3d3297d5ade
 python-dotenv>=1.0,<2.0
