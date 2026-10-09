@@ -7,9 +7,9 @@
 
     <!-- Xiaomi BLE/Classic band (com.example.sleepmonitorsync.band): we connect
          directly by a known MAC address, not via BLE scan, so ACCESS_FINE_LOCATION is
-         not needed (neverForLocation below). BLUETOOTH_SCAN is still required on API
-         31+ purely because BluetoothAdapter.cancelDiscovery() is classified as a scan
-         operation by the platform, even though we never call startDiscovery().
+         not needed (neverForLocation below). BLUETOOTH_SCAN is optional on API 31+:
+         it is used only for cancelDiscovery(), and the connection code skips that call
+         when permission is absent; the app never starts discovery.
          BLUETOOTH_CONNECT covers API 31+; the legacy BLUETOOTH/BLUETOOTH_ADMIN
          permissions cover API 28-30 (minSdk is 28). -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
