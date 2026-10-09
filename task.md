@@ -11,7 +11,7 @@
 - Числовые столбцы истории выровнены вправо; отсутствующие значения отображаются коротким дефисом `-`.
 - Масштаб текста интерфейса увеличен на 20% через Compose density.
 - Кнопка синхронизации растянута на всю ширину, добавлено объяснение отправки данных и условия очистки очереди; начальный статус `Ready` больше не показывается.
-- При первом запуске синхронизации на Android 12+ приложение запрашивает `BLUETOOTH_CONNECT`, необходимое для прямого SPP-подключения. Разрешение «Контроль активности» не нужно для чтения данных непосредственно с браслета; Health Connect удаляется из APK в рамках этой версии.
+- При первом запуске синхронизации на Android 12+ приложение запрашивает `BLUETOOTH_CONNECT`, необходимое для прямого SPP-подключения. Разрешение «Контроль активности» не нужно для чтения данных непосредственно с браслета; Health Connect удалён из APK в рамках этой версии.
 - Упоминание Mi Fitness убрано из подсказки настроек; сохранена инструкция по повторному извлечению ключа браслета через `xiaomi-extractor`.
 - `AppVersion.NUMBER` повышен до 96, дата — 09.10.2026.
 - Коммиты: MainActivity UI/permission flow `f1aa6bd2e0f21266be747b8393dbb242ec2e58e9`; AppVersion v96 `a6fce038aa95b2ecb9df9a8c24d8b1659d524207`.
@@ -19,6 +19,7 @@
 - В `AndroidManifest.xml` удалены Health Connect package query, health permissions и rationale activity declaration. Разрешения прямого Bluetooth SPP и boot receiver сохранены. Commit: `72e123e5654007c706d24e56944a652d812506ad`.
 - Из `android_sync_app/app/build.gradle.kts` удалена зависимость `androidx.health.connect:connect-client`; остальная конфигурация Gradle не менялась. Commit: `8deaf9a61606035bfdc127e4a7afb9d8bb34054b`.
 - Удалён `PermissionsRationaleActivity.kt`, который отображал обоснование разрешений Health Connect и больше не нужен. Commit: `0ed286a7b1b1add89d6ca34dfcf1b6f116f4dca1`.
+- Из build-tag в `MainActivity.kt` удалена даже оставшаяся описательная строка `Health Connect removed`; в Android UI source нет текстовых ссылок на Health Connect/Mi Fitness. Commit: `89b826e03e8ef2395756a90f699da3262a85b534`.
 - Health Connect удалён из Android-кода, manifest и Gradle; `PermissionsRationaleActivity.kt` удалён. Из build-tag также убрана последняя текстовая ссылка на Health Connect. Дерево Android-подпроекта не содержит файлов с `health`/`permission rationale` в имени. APK локально не собирался; компиляция пока не проверена. Следующий шаг — локальная сборка через `build-release-install.bat` и runtime-проверка.
 
 
@@ -499,4 +500,3 @@ Commit версии: b335c8c.
 `python probe.py --start 2026-10-06 --end 2026-10-08`
 
 При проблеме Xiaomi login прислать только `sleep_cloud.json`. Ожидается поле `connect_error`, а не вторичный `client not initialized`. Если `connect()` пройдёт, появятся `raw_records` и/или `sessions` для анализа наличия сна в Cloud.
-- Из build-tag в `MainActivity.kt` удалена даже оставшаяся описательная строка `Health Connect removed`; в Android UI source нет текстовых ссылок на Health Connect/Mi Fitness. Commit: `89b826e03e8ef2395756a90f699da3262a85b534`.
