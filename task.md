@@ -18,7 +18,8 @@
 - Удалены старые методы Health Connect из `SyncHelper.kt`; прямой путь `performBandSync`, очередь, server `/sync` и ACK сохранены. Commit: `d2846757e3ef68308afbddcb0a8ed68410d7fa56`.
 - В `AndroidManifest.xml` удалены Health Connect package query, health permissions и rationale activity declaration. Разрешения прямого Bluetooth SPP и boot receiver сохранены. Commit: `72e123e5654007c706d24e56944a652d812506ad`.
 - Из `android_sync_app/app/build.gradle.kts` удалена зависимость `androidx.health.connect:connect-client`; остальная конфигурация Gradle не менялась. Commit: `8deaf9a61606035bfdc127e4a7afb9d8bb34054b`.
-- Следующий шаг: удалить файл `PermissionsRationaleActivity.kt`, затем проверить актуальные файлы/поиск ссылок. APK локально не собирался; компиляция пока не проверена.
+- Удалён `PermissionsRationaleActivity.kt`, который отображал обоснование разрешений Health Connect и больше не нужен. Commit: `0ed286a7b1b1add89d6ca34dfcf1b6f116f4dca1`.
+- Следующий шаг: проверить актуальные исходники на оставшиеся ссылки Health Connect/Mi Fitness, проверить разрешения и структуру UI. APK локально не собирался; компиляция пока не проверена.
 
 
 ## Текущая настройка синхронизации
