@@ -20,6 +20,7 @@
 - Из `android_sync_app/app/build.gradle.kts` удалена зависимость `androidx.health.connect:connect-client`; остальная конфигурация Gradle не менялась. Commit: `8deaf9a61606035bfdc127e4a7afb9d8bb34054b`.
 - Удалён `PermissionsRationaleActivity.kt`, который отображал обоснование разрешений Health Connect и больше не нужен. Commit: `0ed286a7b1b1add89d6ca34dfcf1b6f116f4dca1`.
 - Из build-tag в `MainActivity.kt` удалена даже оставшаяся описательная строка `Health Connect removed`; в Android UI source нет текстовых ссылок на Health Connect/Mi Fitness. Commit: `89b826e03e8ef2395756a90f699da3262a85b534`.
+- Уточнён комментарий в `AndroidManifest.xml`: `BLUETOOTH_SCAN` необязателен для соединения по известному MAC; если runtime-разрешение отсутствует, код пропускает `cancelDiscovery()`. Обязательный для SPP `BLUETOOTH_CONNECT` запрашивается отдельно. Commit: `2e26a72f19be80d1ad56bb333d6b5ecaa701dd6a`.
 - Health Connect удалён из Android-кода, manifest и Gradle; `PermissionsRationaleActivity.kt` удалён. Из build-tag также убрана последняя текстовая ссылка на Health Connect. Дерево Android-подпроекта не содержит файлов с `health`/`permission rationale` в имени. APK локально не собирался; компиляция пока не проверена. Следующий шаг — локальная сборка через `build-release-install.bat` и runtime-проверка.
 
 
