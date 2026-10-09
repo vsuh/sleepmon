@@ -48,7 +48,7 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        val APP_BUILD_TAG = AppVersion.buildTag("direct SPP; UI cleanup; Health Connect removed")
+        val APP_BUILD_TAG = AppVersion.buildTag("direct SPP; UI cleanup")
         val LOG_TAG = AppVersion.logTag("SleepMonitor")
     }
 
