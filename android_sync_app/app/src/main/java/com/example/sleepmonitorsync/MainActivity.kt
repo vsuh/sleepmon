@@ -21,6 +21,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.time.Instant
@@ -28,12 +31,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import androidx.health.connect.client.HealthConnectClient
-import androidx.health.connect.client.PermissionController
-import androidx.health.connect.client.permission.HealthPermission
-import androidx.health.connect.client.records.HeartRateRecord
-import androidx.health.connect.client.records.SleepSessionRecord
-import androidx.health.connect.client.records.StepsRecord
 import com.example.sleepmonitorsync.band.BandCredentials
 import com.example.sleepmonitorsync.theme.SleepMonitorSyncTheme
 import kotlinx.coroutines.CoroutineScope
@@ -51,17 +48,9 @@ class MainActivity : ComponentActivity() {
          * 2026-09-15 - see 10-projects/sleep-monitor/task.md "process rule" entry).
          * Format: "vN (ДД.ММ.ГГГГ) - краткое описание изменения".
          */
-        val APP_BUILD_TAG = AppVersion.buildTag("единая глобальная версия и sleep diagnostics")
+        val APP_BUILD_TAG = AppVersion.buildTag("direct SPP; UI cleanup; Health Connect removed")
         val LOG_TAG = AppVersion.logTag("SleepMonitor")
     }
-
-    private val permissions = setOf(
-        HealthPermission.getReadPermission(StepsRecord::class),
-        HealthPermission.getReadPermission(HeartRateRecord::class),
-        HealthPermission.getReadPermission(SleepSessionRecord::class)
-    )
-
-    private val requestPermissionActivityContract = PermissionController.createRequestPermissionResultContract()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,39 +71,34 @@ class MainActivity : ComponentActivity() {
         }.apply()
 
         // Background sync scheduling now happens once in SleepMonitorApp.onCreate()
-        // (process start), not here — re-running enqueueUniquePeriodicWork(UPDATE) on
+        // (process start), not here - re-running enqueueUniquePeriodicWork(UPDATE) on
         // every Activity creation risked racing with WorkManager's own periodic
         // dispatch, causing duplicate concurrent SyncWorker runs.
 
-        var status by mutableStateOf("Ready")
+        var status by mutableStateOf("")
         var serverUrl by mutableStateOf(prefs.getString("serverUrl", defaultServerUrl) ?: "")
         var serverUrlBackup by mutableStateOf(
             prefs.getString("serverUrlBackup", defaultServerUrlBackup) ?: ""
         )
         var appPin by mutableStateOf(prefs.getString("appPin", defaultAppPin) ?: "")
 
-        val requestPermissions = registerForActivityResult(requestPermissionActivityContract) { granted ->
-            if (granted.containsAll(permissions)) {
-                status = "Permissions granted! Ready to sync."
+        val requestBluetoothPermission = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            status = if (granted) {
+                "Разрешение Bluetooth получено. Нажмите «Синхронизация» ещё раз."
             } else {
-                status = "Permissions not fully granted."
-            }
-        }
-
-        suspend fun withHealthPermissions(action: suspend (HealthConnectClient) -> Unit) {
-            val client = HealthConnectClient.getOrCreate(this@MainActivity)
-            val granted = client.permissionController.getGrantedPermissions()
-            if (granted.containsAll(permissions)) {
-                action(client)
-            } else {
-                requestPermissions.launch(permissions)
+                "Без разрешения «Устройства поблизости» подключение к браслету невозможно."
             }
         }
 
         setContent {
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, baseDensity.fontScale * 1.2f)) {
             SleepMonitorSyncTheme {
             val context = LocalContext.current
             var showSettings by remember { mutableStateOf(false) }
+            var selectedTab by remember { mutableStateOf("sync") }
             var queue by remember { mutableStateOf<SyncQueue.Pending?>(null) }
             var history by remember { mutableStateOf(SyncHistory.Snapshot(null, emptyList())) }
             var workDiagnostics by remember { mutableStateOf<WorkManagerDiagnostics.Snapshot?>(null) }
@@ -168,57 +152,97 @@ class MainActivity : ComponentActivity() {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Sleep Monitor Sync")
+                    Text(
+                        AppVersion.label,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
                     TextButton(onClick = { showSettings = true }) {
                         Text("⚙ Настройки")
                     }
                 }
-                Text(
-                    "Build: $APP_BUILD_TAG",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 16.dp),
-                )
-
-                SyncHistoryTable(history, queue)
-
-                Spacer(modifier = Modifier.height(20.dp))
-                Button(onClick = {
-                    CoroutineScope(Dispatchers.Main).launch {
-                        status = "Синхронизация с Xiaomi Band..."
-                        try {
-                            SyncHelper.performBandSync(this@MainActivity, serverUrl, serverUrlBackup, appPin) { newStatus ->
-                                status = newStatus
-                            }
-                        } finally {
-                            refreshQueue()
-                            refreshHistory()
-                        }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(
+                        onClick = { selectedTab = "sync" },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            "Синхронизация",
+                            fontWeight = if (selectedTab == "sync") FontWeight.Bold else FontWeight.Normal,
+                        )
                     }
-                }) {
-                    Text("Sync Now")
+                    TextButton(
+                        onClick = { selectedTab = "work" },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            "WorkManager",
+                            fontWeight = if (selectedTab == "work") FontWeight.Bold else FontWeight.Normal,
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(status)
+                Spacer(modifier = Modifier.height(12.dp))
+                if (selectedTab == "sync") {
+                    SyncHistoryTable(history, queue)
 
-                Spacer(modifier = Modifier.height(24.dp))
-                SyncQueueStatus(
-                    pending = queue,
-                    dateFormatter = queueDateFormatter,
-                )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) !=
+                                android.content.pm.PackageManager.PERMISSION_GRANTED
+                            ) {
+                                requestBluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                            } else {
+                                CoroutineScope(Dispatchers.Main).launch {
+                                    status = "Синхронизация с Xiaomi Band..."
+                                    try {
+                                        SyncHelper.performBandSync(this@MainActivity, serverUrl, serverUrlBackup, appPin) { newStatus ->
+                                            status = newStatus
+                                        }
+                                    } finally {
+                                        refreshQueue()
+                                        refreshHistory()
+                                    }
+                                }
+                            }
+                        },
+                    ) {
+                        Text("Синхронизировать")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Считывает данные с Xiaomi Band и отправляет их на сервер. Очередь очищается только после успешной синхронизации и подтверждения браслету.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    if (status.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(status)
+                    }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "Последняя успешная синхронизация: " + formatLastSuccessfulSync(history.lastSuccessfulSyncAt),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-                WorkManagerDiagnosticsSection(workDiagnostics)
+                    Spacer(modifier = Modifier.height(24.dp))
+                    SyncQueueStatus(
+                        pending = queue,
+                        dateFormatter = queueDateFormatter,
+                    )
+                } else {
+                    WorkManagerDiagnosticsSection(workDiagnostics)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "Последняя успешная синхронизация: " + formatLastSuccessfulSync(history.lastSuccessfulSyncAt),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(32.dp))
+            }
             }
             }
             }
@@ -246,13 +270,13 @@ private fun WorkManagerDiagnosticsSection(snapshot: WorkManagerDiagnostics.Snaps
                     WorkManagerDiagnostics.formatTime(info.nextScheduleTimeMillis) +
                         " (" + WorkManagerDiagnostics.formatDelay(info.nextScheduleTimeMillis) + ")"
                 } else {
-                    "—"
+                    "-"
                 }
         )
-        Text("Попытка: " + (info?.runAttemptCount ?: "—"))
+        Text("Попытка: " + (info?.runAttemptCount ?: "-"))
         Text(
             "Остановка: " +
-                if (info == null) "—" else WorkManagerDiagnostics.stopReasonLabel(
+                if (info == null) "-" else WorkManagerDiagnostics.stopReasonLabel(
                     if (android.os.Build.VERSION.SDK_INT >= 31) info.stopReason else null
                 )
         )
@@ -374,8 +398,7 @@ private fun SettingsScreen(
         Spacer(modifier = Modifier.height(32.dp))
         Text("Xiaomi Band", style = MaterialTheme.typography.labelLarge)
         Text(
-            "Ключ авторизации периодически протухает (обычно после переустановки/перепривязки Mi Fitness) - " +
-                "переизвлеките его через xiaomi-extractor и вставьте сюда, без пересборки приложения.",
+            "Если ключ авторизации перестал работать, заново извлеките его через xiaomi-extractor и вставьте сюда - пересборка приложения не требуется.",
             style = MaterialTheme.typography.bodySmall,
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -436,13 +459,13 @@ private fun formatShortDate(date: LocalDate): String =
     "${date.dayOfMonth} ${RUSSIAN_SHORT_MONTHS[date.monthValue - 1]}"
 
 private fun formatSleep(hours: Double): String {
-    if (hours <= 0.0) return "—"
+    if (hours <= 0.0) return "-"
     val totalMinutes = (hours * 60.0).toInt()
     return "${totalMinutes / 60}ч ${totalMinutes % 60}м"
 }
 
 private fun formatSteps(steps: Int): String =
-    if (steps > 0) String.format(Locale.ROOT, "%,d", steps).replace(",", " ") else "—"
+    if (steps > 0) String.format(Locale.ROOT, "%,d", steps).replace(",", " ") else "-"
 
 private data class DisplayDay(
     val sleepHours: Double,
@@ -474,11 +497,11 @@ private fun SyncHistoryTable(history: SyncHistory.Snapshot, pending: SyncQueue.P
 
         Row(modifier = Modifier.fillMaxWidth()) {
             TableCell("Дата", 1.1f, true)
-            TableCell("Сон", 1.0f, true)
-            TableCell("Пульс", 0.9f, true)
-            TableCell("Во сне", 0.9f, true)
-            TableCell("Шаги", 1.2f, true)
-            TableCell("Проб.", 0.8f, true)
+            TableCell("Сон", 1.0f, true, alignEnd = true)
+            TableCell("Пульс", 0.9f, true, alignEnd = true)
+            TableCell("Во сне", 0.9f, true, alignEnd = true)
+            TableCell("Шаги", 1.2f, true, alignEnd = true)
+            TableCell("Проб.", 0.8f, true, alignEnd = true)
         }
 
         (0L..6L).forEach { offset ->
@@ -486,11 +509,11 @@ private fun SyncHistoryTable(history: SyncHistory.Snapshot, pending: SyncQueue.P
             val day = byDate[date.toString()]
             Row(modifier = Modifier.fillMaxWidth()) {
                 TableCell(formatShortDate(date), 1.1f)
-                TableCell(formatSleep(day?.sleepHours ?: 0.0), 1.0f)
-                TableCell(day?.pulseAvgDay?.takeIf { it > 0 }?.toString() ?: "—", 0.9f)
-                TableCell(day?.pulseAvgSleep?.takeIf { it > 0 }?.toString() ?: "—", 0.9f)
-                TableCell(day?.stepsTotal?.takeIf { it > 0 }?.let(::formatSteps) ?: "—", 1.2f)
-                TableCell(day?.sleepAwakenings?.takeIf { it > 0 }?.toString() ?: "—", 0.8f)
+                TableCell(formatSleep(day?.sleepHours ?: 0.0), 1.0f, alignEnd = true)
+                TableCell(day?.pulseAvgDay?.takeIf { it > 0 }?.toString() ?: "-", 0.9f, alignEnd = true)
+                TableCell(day?.pulseAvgSleep?.takeIf { it > 0 }?.toString() ?: "-", 0.9f, alignEnd = true)
+                TableCell(day?.stepsTotal?.takeIf { it > 0 }?.let(::formatSteps) ?: "-", 1.2f, alignEnd = true)
+                TableCell(day?.sleepAwakenings?.takeIf { it > 0 }?.toString() ?: "-", 0.8f, alignEnd = true)
             }
         }
     }
@@ -501,12 +524,14 @@ private fun RowScope.TableCell(
     text: String,
     weight: Float,
     header: Boolean = false,
+    alignEnd: Boolean = false,
 ) {
     Text(
         text = text,
         modifier = Modifier
             .weight(weight)
             .padding(vertical = 5.dp, horizontal = 2.dp),
+        textAlign = if (alignEnd) TextAlign.End else TextAlign.Start,
         style = if (header) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
         fontWeight = if (header) FontWeight.Bold else FontWeight.Normal,
         maxLines = 1,
