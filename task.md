@@ -19,7 +19,7 @@
 - В `AndroidManifest.xml` удалены Health Connect package query, health permissions и rationale activity declaration. Разрешения прямого Bluetooth SPP и boot receiver сохранены. Commit: `72e123e5654007c706d24e56944a652d812506ad`.
 - Из `android_sync_app/app/build.gradle.kts` удалена зависимость `androidx.health.connect:connect-client`; остальная конфигурация Gradle не менялась. Commit: `8deaf9a61606035bfdc127e4a7afb9d8bb34054b`.
 - Удалён `PermissionsRationaleActivity.kt`, который отображал обоснование разрешений Health Connect и больше не нужен. Commit: `0ed286a7b1b1add89d6ca34dfcf1b6f116f4dca1`.
-- Health Connect удалён из Android-кода, manifest и Gradle; `PermissionsRationaleActivity.kt` удалён. В проверенных Android-файлах `MainActivity.kt`, `SyncHelper.kt`, `AndroidManifest.xml` и `app/build.gradle.kts` ссылок на Health Connect/Mi Fitness не осталось, кроме описательного build-tag в `MainActivity.kt` (это только текст Logcat). Дерево репозитория не содержит файлов с `health`/`permission rationale` в имени. APK локально не собирался; компиляция пока не проверена. Следующий шаг — локальная сборка через `build-release-install.bat` и runtime-проверка.
+- Health Connect удалён из Android-кода, manifest и Gradle; `PermissionsRationaleActivity.kt` удалён. Из build-tag также убрана последняя текстовая ссылка на Health Connect. Дерево Android-подпроекта не содержит файлов с `health`/`permission rationale` в имени. APK локально не собирался; компиляция пока не проверена. Следующий шаг — локальная сборка через `build-release-install.bat` и runtime-проверка.
 
 
 ## Текущая настройка синхронизации
@@ -499,3 +499,4 @@ Commit версии: b335c8c.
 `python probe.py --start 2026-10-06 --end 2026-10-08`
 
 При проблеме Xiaomi login прислать только `sleep_cloud.json`. Ожидается поле `connect_error`, а не вторичный `client not initialized`. Если `connect()` пройдёт, появятся `raw_records` и/или `sessions` для анализа наличия сна в Cloud.
+- Из build-tag в `MainActivity.kt` удалена даже оставшаяся описательная строка `Health Connect removed`; в Android UI source нет текстовых ссылок на Health Connect/Mi Fitness. Commit: `89b826e03e8ef2395756a90f699da3262a85b534`.
