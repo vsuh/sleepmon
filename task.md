@@ -4,7 +4,7 @@
 
 ## Android APK v96 — возврат к приложению и обновление UI (09.10.2026)
 
-Работа продолжается; изменения ниже уже записаны в GitHub, но очистка Health Connect и итоговая проверка ещё не завершены.
+Основные изменения UI и удаление Health Connect записаны в GitHub. Остались финальная проверка исходников и локальная сборка/проверка на устройстве.
 
 - В `MainActivity.kt` заголовок теперь показывает только версию и дату; текст Build убран.
 - Диагностика WorkManager вынесена на отдельную вкладку; основная вкладка содержит историю, кнопку синхронизации и очередь.
@@ -19,7 +19,7 @@
 - В `AndroidManifest.xml` удалены Health Connect package query, health permissions и rationale activity declaration. Разрешения прямого Bluetooth SPP и boot receiver сохранены. Commit: `72e123e5654007c706d24e56944a652d812506ad`.
 - Из `android_sync_app/app/build.gradle.kts` удалена зависимость `androidx.health.connect:connect-client`; остальная конфигурация Gradle не менялась. Commit: `8deaf9a61606035bfdc127e4a7afb9d8bb34054b`.
 - Удалён `PermissionsRationaleActivity.kt`, который отображал обоснование разрешений Health Connect и больше не нужен. Commit: `0ed286a7b1b1add89d6ca34dfcf1b6f116f4dca1`.
-- Следующий шаг: проверить актуальные исходники на оставшиеся ссылки Health Connect/Mi Fitness, проверить разрешения и структуру UI. APK локально не собирался; компиляция пока не проверена.
+- Health Connect удалён из Android-кода, manifest и Gradle; `PermissionsRationaleActivity.kt` удалён. В проверенных Android-файлах `MainActivity.kt`, `SyncHelper.kt`, `AndroidManifest.xml` и `app/build.gradle.kts` ссылок на Health Connect/Mi Fitness не осталось, кроме описательного build-tag в `MainActivity.kt` (это только текст Logcat). Дерево репозитория не содержит файлов с `health`/`permission rationale` в имени. APK локально не собирался; компиляция пока не проверена. Следующий шаг — локальная сборка через `build-release-install.bat` и runtime-проверка.
 
 
 ## Текущая настройка синхронизации
