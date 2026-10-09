@@ -15,6 +15,8 @@
 
 - Из `AndroidManifest.xml` удалены package query, permissions и activity intent filters, относящиеся к Health Connect; Bluetooth permissions и BootReceiver оставлены. Commit: `72e123e5654007c706d24e56944a652d812506ad`.
 
+- Удалена зависимость `androidx.health.connect:connect-client` из Gradle; другие зависимости не менялись. Commit: `8deaf9a61606035bfdc127e4a7afb9d8bb34054b`.
+
 ### В процессе / не проверено
 
 - Нужно удалить оставшиеся старые Health Connect методы из `SyncHelper.kt`, убрать зависимость, Health Connect permissions/queries и activity из manifest, удалить `PermissionsRationaleActivity.kt`.
