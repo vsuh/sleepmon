@@ -21,9 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.time.Instant
@@ -93,8 +91,6 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val baseDensity = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, baseDensity.fontScale * 1.2f)) {
             SleepMonitorSyncTheme {
             val context = LocalContext.current
             var showSettings by remember { mutableStateOf(false) }
@@ -153,7 +149,7 @@ class MainActivity : ComponentActivity() {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        AppVersion.label,
+                        "Sleep Monitor · ${AppVersion.label}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
@@ -216,11 +212,6 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text("Синхронизировать")
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Считывает данные с Xiaomi Band и отправляет их на сервер. Очередь очищается только после успешной синхронизации и подтверждения браслету.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
                     if (status.isNotBlank()) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(status)
