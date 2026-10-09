@@ -11,6 +11,8 @@
 - AppVersion повышена до v96 от 09.10.2026.
 - Commits: `f1aa6bd2e0f21266be747b8393dbb242ec2e58e9` (MainActivity), `a6fce038aa95b2ecb9df9a8c24d8b1659d524207` (AppVersion), `e62199ed10a8b8250a6752774f9d3ec0199f5efa` (task.md).
 
+- Из `SyncHelper.kt` удалены неиспользуемые старые Health Connect entry points и методы чтения шагов/сна/пульса через Health Connect. Прямой Bluetooth SPP путь и общие функции server login/post сохранены. Commit: `d2846757e3ef68308afbddcb0a8ed68410d7fa56`.
+
 ### В процессе / не проверено
 
 - Нужно удалить оставшиеся старые Health Connect методы из `SyncHelper.kt`, убрать зависимость, Health Connect permissions/queries и activity из manifest, удалить `PermissionsRationaleActivity.kt`.
