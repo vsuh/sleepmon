@@ -154,10 +154,6 @@ dependencies {
   implementation(libs.androidx.navigation3.runtime)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 
-  // Health Connect (legacy data source, kept in parallel with the direct BLE
-  // path during the transition - see 10-projects/sleep-monitor/task.md Этап E)
-  implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
-
   // HTTP Client
   implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
