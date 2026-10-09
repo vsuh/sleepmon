@@ -15,7 +15,8 @@
 - Упоминание Mi Fitness убрано из подсказки настроек; сохранена инструкция по повторному извлечению ключа браслета через `xiaomi-extractor`.
 - `AppVersion.NUMBER` повышен до 96, дата — 09.10.2026.
 - Коммиты: MainActivity UI/permission flow `f1aa6bd2e0f21266be747b8393dbb242ec2e58e9`; AppVersion v96 `a6fce038aa95b2ecb9df9a8c24d8b1659d524207`.
-- Следующий шаг: удалить старые Health Connect методы и зависимости, затем проверить актуальные файлы/поиск ссылок. APK локально не собирался; компиляция пока не проверена.
+- Удалены старые методы Health Connect из `SyncHelper.kt`; прямой путь `performBandSync`, очередь, server `/sync` и ACK сохранены. Commit: `d2846757e3ef68308afbddcb0a8ed68410d7fa56`.
+- Следующий шаг: убрать Health Connect permissions/queries и activity из manifest, удалить зависимость и `PermissionsRationaleActivity.kt`, затем проверить актуальные файлы/поиск ссылок. APK локально не собирался; компиляция пока не проверена.
 
 
 ## Текущая настройка синхронизации
