@@ -18,7 +18,7 @@
 - Удалена зависимость `androidx.health.connect:connect-client` из Gradle; другие зависимости не менялись. Commit: `8deaf9a61606035bfdc127e4a7afb9d8bb34054b`.
 
 - Удалён `PermissionsRationaleActivity.kt`, поскольку он был нужен только для rationale flow Health Connect. Commit: `0ed286a7b1b1add89d6ca34dfcf1b6f116f4dca1`.
-- После удаления получено recursive tree GitHub: в Android subtree 69 файлов; файлов с `health` или `permission rationale` в имени нет. Повторно прочитаны ключевые файлы: в `SyncHelper.kt`, `AndroidManifest.xml` и `app/build.gradle.kts` Health Connect references отсутствуют. В `MainActivity.kt` осталось только описательное значение build-tag `Health Connect removed`, не интеграционный код.
+- После удаления получено recursive tree GitHub: в Android subtree 69 файлов; файлов с `health` или `permission rationale` в имени нет. Повторно прочитаны ключевые файлы: в `SyncHelper.kt`, `AndroidManifest.xml` и `app/build.gradle.kts` Health Connect references отсутствуют. Из build-tag удалена последняя описательная строка `Health Connect removed`, commit `89b826e03e8ef2395756a90f699da3262a85b534`.
 
 ### В процессе / не проверено
 
