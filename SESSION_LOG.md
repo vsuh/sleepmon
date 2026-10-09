@@ -18,10 +18,11 @@
 - Удалена зависимость `androidx.health.connect:connect-client` из Gradle; другие зависимости не менялись. Commit: `8deaf9a61606035bfdc127e4a7afb9d8bb34054b`.
 
 - Удалён `PermissionsRationaleActivity.kt`, поскольку он был нужен только для rationale flow Health Connect. Commit: `0ed286a7b1b1add89d6ca34dfcf1b6f116f4dca1`.
+- После удаления получено recursive tree GitHub: в Android subtree 69 файлов; файлов с `health` или `permission rationale` в имени нет. Повторно прочитаны ключевые файлы: в `SyncHelper.kt`, `AndroidManifest.xml` и `app/build.gradle.kts` Health Connect references отсутствуют. В `MainActivity.kt` осталось только описательное значение build-tag `Health Connect removed`, не интеграционный код.
 
 ### В процессе / не проверено
 
-- Нужно удалить оставшиеся старые Health Connect методы из `SyncHelper.kt`, убрать зависимость, Health Connect permissions/queries и activity из manifest, удалить `PermissionsRationaleActivity.kt`.
+- Статически проверить итоговые изменения и выполнить локальную сборку/проверку на устройстве. Известные Health Connect entry points, manifest permissions/query/activity, Gradle dependency и `PermissionsRationaleActivity.kt` уже удалены.
 - Нужно после каждого следующего изменения кода обновлять `task.md` и этот журнал.
 - APK не собирался; компиляция и поведение на устройстве не проверены. Сборка — локально через `build-release-install.bat`.
 - Xiaomi Cloud probe не запускался и остаётся отложенным.
