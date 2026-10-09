@@ -17,6 +17,8 @@
 
 - Удалена зависимость `androidx.health.connect:connect-client` из Gradle; другие зависимости не менялись. Commit: `8deaf9a61606035bfdc127e4a7afb9d8bb34054b`.
 
+- Удалён `PermissionsRationaleActivity.kt`, поскольку он был нужен только для rationale flow Health Connect. Commit: `0ed286a7b1b1add89d6ca34dfcf1b6f116f4dca1`.
+
 ### В процессе / не проверено
 
 - Нужно удалить оставшиеся старые Health Connect методы из `SyncHelper.kt`, убрать зависимость, Health Connect permissions/queries и activity из manifest, удалить `PermissionsRationaleActivity.kt`.
