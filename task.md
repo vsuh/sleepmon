@@ -16,7 +16,8 @@
 - `AppVersion.NUMBER` повышен до 96, дата — 09.10.2026.
 - Коммиты: MainActivity UI/permission flow `f1aa6bd2e0f21266be747b8393dbb242ec2e58e9`; AppVersion v96 `a6fce038aa95b2ecb9df9a8c24d8b1659d524207`.
 - Удалены старые методы Health Connect из `SyncHelper.kt`; прямой путь `performBandSync`, очередь, server `/sync` и ACK сохранены. Commit: `d2846757e3ef68308afbddcb0a8ed68410d7fa56`.
-- Следующий шаг: убрать Health Connect permissions/queries и activity из manifest, удалить зависимость и `PermissionsRationaleActivity.kt`, затем проверить актуальные файлы/поиск ссылок. APK локально не собирался; компиляция пока не проверена.
+- В `AndroidManifest.xml` удалены Health Connect package query, health permissions и rationale activity declaration. Разрешения прямого Bluetooth SPP и boot receiver сохранены. Commit: `72e123e5654007c706d24e56944a652d812506ad`.
+- Следующий шаг: удалить зависимость Health Connect и файл `PermissionsRationaleActivity.kt`, затем проверить актуальные файлы/поиск ссылок. APK локально не собирался; компиляция пока не проверена.
 
 
 ## Текущая настройка синхронизации
