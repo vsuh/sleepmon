@@ -7,7 +7,7 @@ object AppVersion {
      * and bump the number HERE only. Never lower it: Android refuses to install an APK with
      * a smaller versionCode over an already installed one.
      */
-    const val NUMBER = 100
+    const val NUMBER = 101
     const val DATE = "10.10.2026"
 
     val label: String
