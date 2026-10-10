@@ -42,6 +42,7 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
             return result
         }
 
+        var lastProblem: String? = null
         val success = SyncHelper.performBandSync(
             applicationContext,
             primaryUrl,
@@ -49,6 +50,7 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
             pin
         ) { status ->
             VersionedLog.i(TAG, status)
+            if (status.startsWith("❌") || status.startsWith("⚠")) lastProblem = status
         }
 
         return if (success) {
@@ -62,7 +64,8 @@ class SyncWorker(appContext: Context, workerParams: WorkerParameters) :
             // The persistent queue keeps the data, and the next hourly periodic run will retry.
             val result = Result.failure()
             WorkManagerDiagnostics.recordFinished(
-                applicationContext, workId, WorkManagerDiagnostics.Outcome.RETRY
+                applicationContext, workId, WorkManagerDiagnostics.Outcome.RETRY,
+                lastProblem ?: "Синхронизация не удалась (причина не определена)"
             )
             result
         }
