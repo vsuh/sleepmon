@@ -11,11 +11,11 @@ SET "ver_f=app\src\main\java\com\example\sleepmonitorsync\AppVersion.kt"
 
 cd /d "%~dp0"
 
-echo [0/3] Get latest changes from GitHub
+powershell -NoProfile -Command "Write-Host '[0/3] Get latest changes from GitHub' -ForegroundColor Cyan"
 git pull
 
 echo.
-echo [1/3] Building signed release APK...
+powershell -NoProfile -Command "Write-Host '[1/3] Building signed release APK...' -ForegroundColor Cyan"
 call gradlew.bat assembleRelease
 if errorlevel 1 (
     echo.
@@ -32,7 +32,7 @@ if not exist "%APK%" (
 )
 
 echo.
-echo [2/3] Verifying APK signature...
+powershell -NoProfile -Command "Write-Host '[2/3] Verifying APK signature...' -ForegroundColor Cyan"
 set "SDK=%ANDROID_SDK_ROOT%"
 if not defined SDK set "SDK=%ANDROID_HOME%"
 if not defined SDK (
@@ -64,7 +64,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/3] Installing APK on the connected phone...
+powershell -NoProfile -Command "Write-Host '[3/3] Installing APK on the connected phone...' -ForegroundColor Cyan"
 
 for /f "delims=" %%i in ('where adb 2^>nul') do set "_ADB=%%i"
 

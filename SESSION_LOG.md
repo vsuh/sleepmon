@@ -82,3 +82,16 @@
 - Не менять secure SPP без конкретного подтверждения в реальном Logcat.
 - ACK браслету — только после успешного server sync; при ошибке сохранять очередь.
 - Не хранить секреты в Git или Logcat.
+
+## Сессия 10.10.2026 — v98
+
+- Состояние проверено: `task.md`, `AI_CONTEXT.md`, `SESSION_LOG.md`, локальный `MainActivity.kt`; лог сборки показал `Already up to date`, то есть чекаут совпадает с origin.
+- Ошибка v97: лишняя `}` в `MainActivity.kt` (остаток после удаления `CompositionLocalProvider`). Удалена, `AppVersion` → v98 (10.10.2026).
+- Изменения только в локальном чекауте; commit/push не делались, сборка не запускалась.
+
+## Сессия 10.10.2026 — подсветка этапов в BAT
+
+- Состояние проверено: `task.md`, `AI_CONTEXT.md`, `SESSION_LOG.md`, локальный git (HEAD `ae80916`, ветка `master`); GitHub connector в сессии недоступен, работа через Filesystem connector. Пользователь подтвердил: сборка v98 прошла без ошибок.
+- `android_sync_app/build-release-install.bat`: строки этапов `[0/3]`…`[3/3]` выводятся голубым (Cyan) через `powershell Write-Host -ForegroundColor Cyan`; остальная логика не менялась.
+- Android-код не менялся, `AppVersion` не повышалась (v98).
+- commit/push не делались; сборка не запускалась, цвет в консоли не проверялся.

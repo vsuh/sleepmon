@@ -1,5 +1,24 @@
 # Sleep Monitor — текущее состояние
 
+## Подсветка этапов в build-release-install.bat (10.10.2026)
+
+- Пользователь сообщил: сборка v98 прошла без ошибок (компиляция `MainActivity.kt` исправлена). Установка/runtime-проверка v98 на устройстве ещё не подтверждены.
+- В `android_sync_app/build-release-install.bat` строки этапов `[0/3]`…`[3/3]` теперь выводятся **голубым** (Cyan) цветом через `powershell -NoProfile -Command "Write-Host '...' -ForegroundColor Cyan"`. ANSI-escape не используется, поэтому цвет не зависит от настроек консоли; PowerShell в скрипте и так уже применяется.
+- Тексты этапов, порядок шагов и обработка ошибок (`exit /b 1`) не менялись; сообщения `ERROR:`/`SUCCESS:` остались без цвета.
+- Android-код не менялся, поэтому `AppVersion` не повышалась (остаётся v98, 10.10.2026).
+- Изменение сделано в локальном чекауте через Filesystem connector; **commit/push не выполнялись** — нужно закоммитить `android_sync_app/build-release-install.bat`, `task.md`, `SESSION_LOG.md` (а также `MainActivity.kt` и `AppVersion.kt` v98, если они ещё не закоммичены).
+- Не проверено: фактический вывод цвета в консоли пользователя — проверится при следующем запуске скрипта.
+
+## Исправление release-компиляции после v97 — v98 (10.10.2026)
+
+Локальная сборка v97 (`build-release-install.bat`) упала: `MainActivity.kt:243:1 Syntax error: Expecting a top level declaration`.
+
+- Причина: при удалении `CompositionLocalProvider` (увеличенный fontScale) в v97 осталась лишняя закрывающая `}` в конце `setContent`. Баланс скобок: нужно 7 (Column, else, Surface, SleepMonitorSyncTheme, setContent, onCreate, class), было 8.
+- Исправление: удалена одна лишняя `}` в конце `onCreate`/`setContent`; логика и UI не менялись.
+- `AppVersion.NUMBER` повышен 97 → **98**, дата `10.10.2026`.
+- Правки сделаны в локальном чекауте vault через Filesystem connector; **commit/push не выполнялись** (GitHub connector в этой сессии недоступен) — нужно закоммитить и запушить `MainActivity.kt` и `AppVersion.kt`.
+- Компиляция не проверялась. Следующий шаг: `android_sync_app\build-release-install.bat`, при новой ошибке прислать лог.
+
 ## Android APK v97 — правка заголовка и кнопки (09.10.2026)
 
 По отзыву пользователя восстановлено название приложения в заголовке: `Sleep Monitor · v97 (09.10.2026)`. Удалено принудительное увеличение шрифта на 20%, поэтому применяется стандартный масштаб шрифта устройства. Удалён поясняющий абзац под кнопкой «Синхронизировать»; динамический статус и очередь сохранены.
