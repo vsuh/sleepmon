@@ -251,6 +251,23 @@ private fun WorkManagerDiagnosticsSection(snapshot: WorkManagerDiagnostics.Snaps
     val lastRun = snapshot?.lastRun
 
     Column(modifier = Modifier.fillMaxWidth()) {
+        snapshot?.band?.let { band ->
+            Text(
+                "⚠ Браслет недоступен уже " +
+                    WorkManagerDiagnostics.formatDuration(System.currentTimeMillis() - band.failingSince) +
+                    " (с " + WorkManagerDiagnostics.formatTime(band.failingSince) + ")",
+                color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                "Неудачных попыток подряд: " + band.failCount,
+                color = MaterialTheme.colorScheme.error,
+            )
+            band.lastError?.takeIf { it.isNotBlank() }?.let {
+                Text("Последняя ошибка: " + it, color = MaterialTheme.colorScheme.error)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
         Text(
             "Фоновая задача WorkManager",
             style = MaterialTheme.typography.titleMedium,
