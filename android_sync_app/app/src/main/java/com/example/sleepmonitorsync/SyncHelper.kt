@@ -48,11 +48,14 @@ object SyncHelper {
         }
 
         val connection = XiaomiBandClassicConnection(context, credentials)
+        // true once the band answered auth + fetch; later failures (server/ACK) are not band problems
+        var bandReached = false
         try {
             onStatus("🔗 Подключаюсь к Xiaomi Band...")
             val auth = connection.authenticate()
             if (auth.isFailure) {
                 val msg = "❌ Xiaomi auth: ${auth.exceptionOrNull()?.message}"
+                WorkManagerDiagnostics.recordBandProblem(context, msg)
                 VersionedLog.e(TAG, msg, auth.exceptionOrNull())
                 onStatus(msg)
                 return@withExclusiveSppOperation false
@@ -62,12 +65,15 @@ object SyncHelper {
             val fetch = connection.fetchActivityData()
             if (fetch.isFailure) {
                 val msg = "❌ Xiaomi fetch: ${fetch.exceptionOrNull()?.message}"
+                WorkManagerDiagnostics.recordBandProblem(context, msg)
                 VersionedLog.e(TAG, msg, fetch.exceptionOrNull())
                 onStatus(msg)
                 return@withExclusiveSppOperation false
             }
 
             val result = fetch.getOrThrow()
+            bandReached = true
+            WorkManagerDiagnostics.recordBandOk(context)
             VersionedLog.i(TAG, "Xiaomi fetch result: received=${result.filesReceived}, failed=${result.filesFailed}, unsupported=${result.filesUnsupported}, sleep=${result.sleepSummaries.size}, minuteSamples=${result.perMinuteSamples.size}, dailySummaries=${result.dailySummaries.size}")
             if (result.unsupportedFileDescriptions.isNotEmpty()) {
                 VersionedLog.w(TAG, "Unsupported activity files: ${result.unsupportedFileDescriptions.size}")
@@ -126,6 +132,12 @@ object SyncHelper {
             return@withExclusiveSppOperation true
         } catch (e: Exception) {
             VersionedLog.e(TAG, "❌ Xiaomi sync failed: ${e.message}", e)
+            if (!bandReached && e !is kotlinx.coroutines.CancellationException) {
+                WorkManagerDiagnostics.recordBandProblem(
+                    context,
+                    "❌ Xiaomi sync: " + (e.localizedMessage ?: e::class.java.simpleName)
+                )
+            }
             onStatus("❌ Xiaomi sync: ${e.localizedMessage}")
             return@withExclusiveSppOperation false
         } finally {
