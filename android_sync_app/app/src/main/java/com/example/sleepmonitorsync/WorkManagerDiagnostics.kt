@@ -29,6 +29,9 @@ object WorkManagerDiagnostics {
     private const val KEY_OUTCOME = "last_outcome"
     private const val KEY_DETAIL = "last_detail"
     private const val KEY_STOP_REASON = "last_stop_reason"
+    private const val KEY_BAND_FAIL_SINCE = "band_fail_since"
+    private const val KEY_BAND_FAIL_COUNT = "band_fail_count"
+    private const val KEY_BAND_LAST_ERROR = "band_last_error"
 
     enum class Outcome {
         STARTED, SUCCESS, RETRY, FAILURE, EXCEPTION, STOPPED,
@@ -43,10 +46,55 @@ object WorkManagerDiagnostics {
         val stopReason: Int?,
     )
 
+    /** Series of consecutive failures to reach the band (auth/fetch), cleared by the first success. */
+    data class BandStatus(
+        val failingSince: Long,
+        val failCount: Int,
+        val lastError: String?,
+    )
+
     data class Snapshot(
         val workInfo: WorkInfo?,
         val lastRun: LastRun,
+        val band: BandStatus? = null,
     )
+
+    fun recordBandProblem(context: Context, message: String?) {
+        val p = prefs(context)
+        val since = p.getLong(KEY_BAND_FAIL_SINCE, 0L).takeIf { it > 0L } ?: System.currentTimeMillis()
+        p.edit()
+            .putLong(KEY_BAND_FAIL_SINCE, since)
+            .putInt(KEY_BAND_FAIL_COUNT, p.getInt(KEY_BAND_FAIL_COUNT, 0) + 1)
+            .putStringOrRemove(KEY_BAND_LAST_ERROR, message)
+            .apply()
+    }
+
+    fun recordBandOk(context: Context) {
+        prefs(context).edit()
+            .remove(KEY_BAND_FAIL_SINCE)
+            .remove(KEY_BAND_FAIL_COUNT)
+            .remove(KEY_BAND_LAST_ERROR)
+            .apply()
+    }
+
+    private fun loadBandStatus(context: Context): BandStatus? {
+        val p = prefs(context)
+        val since = p.getLong(KEY_BAND_FAIL_SINCE, 0L).takeIf { it > 0L } ?: return null
+        return BandStatus(
+            failingSince = since,
+            failCount = p.getInt(KEY_BAND_FAIL_COUNT, 0),
+            lastError = p.getString(KEY_BAND_LAST_ERROR, null),
+        )
+    }
+
+    fun formatDuration(millis: Long): String {
+        val minutes = (millis / 60000L).coerceAtLeast(0L)
+        return when {
+            minutes < 60L -> "${minutes}м"
+            minutes < 1440L -> "${minutes / 60L}ч ${minutes % 60L}м"
+            else -> "${minutes / 1440L}д ${((minutes % 1440L) / 60L)}ч"
+        }
+    }
 
     fun recordStarted(context: Context, workId: UUID) {
         prefs(context).edit()
@@ -99,7 +147,7 @@ object WorkManagerDiagnostics {
                 .firstOrNull()
         }.getOrNull()
 
-        Snapshot(workInfo, loadLastRun(context))
+        Snapshot(workInfo, loadLastRun(context), loadBandStatus(context))
     }
 
     fun formatTime(timestampMillis: Long?): String {
