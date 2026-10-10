@@ -486,15 +486,48 @@ private data class DisplayDay(
     val sleepAwakenings: Int,
 )
 
+/**
+ * Overlays a not-yet-delivered queue day on top of the stored history row.
+ *
+ * The queue row must NOT replace the history row wholesale: a day that is re-fetched later
+ * usually carries sleep=0 (the sleep file was already ACKed in an earlier sync), and the server
+ * keeps the stored night in that case. Mirror the server /sync rules so the screen never shows
+ * less than what is already stored: the sleep group (duration, sleep pulse, awakenings) is taken
+ * from the queue only if the queued night is longer; waking pulse and steps only if > 0.
+ */
+private fun overlayPending(old: DisplayDay?, queued: SyncQueue.PendingDay): DisplayDay {
+    if (old == null) {
+        return DisplayDay(
+            queued.sleepHours, queued.pulseAvgDay, queued.pulseAvgSleep,
+            queued.stepsTotal, queued.sleepAwakenings
+        )
+    }
+    val queuedNightLonger = queued.sleepHours > old.sleepHours
+    val sameNight = queued.sleepHours > 0.0 && queued.sleepHours == old.sleepHours
+    return DisplayDay(
+        sleepHours = if (queuedNightLonger) queued.sleepHours else old.sleepHours,
+        pulseAvgDay = if (queued.pulseAvgDay > 0) queued.pulseAvgDay else old.pulseAvgDay,
+        pulseAvgSleep = when {
+            queuedNightLonger && queued.pulseAvgSleep > 0 -> queued.pulseAvgSleep
+            sameNight && old.pulseAvgSleep == 0 -> queued.pulseAvgSleep
+            else -> old.pulseAvgSleep
+        },
+        stepsTotal = if (queued.stepsTotal > 0) queued.stepsTotal else old.stepsTotal,
+        sleepAwakenings = when {
+            queuedNightLonger -> queued.sleepAwakenings
+            sameNight && old.sleepAwakenings == 0 -> queued.sleepAwakenings
+            else -> old.sleepAwakenings
+        },
+    )
+}
+
 @Composable
 private fun SyncHistoryTable(history: SyncHistory.Snapshot, pending: SyncQueue.Pending?) {
     val byDate = history.days.associate {
         it.date to DisplayDay(it.sleepHours, it.pulseAvgDay, it.pulseAvgSleep, it.stepsTotal, it.sleepAwakenings)
     }.toMutableMap()
     pending?.days?.forEach { day ->
-        byDate[day.date] = DisplayDay(
-            day.sleepHours, day.pulseAvgDay, day.pulseAvgSleep, day.stepsTotal, day.sleepAwakenings
-        )
+        byDate[day.date] = overlayPending(byDate[day.date], day)
     }
     val today = LocalDate.now()
 
