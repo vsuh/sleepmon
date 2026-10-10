@@ -51,12 +51,23 @@ object SyncQueue {
                 if (incoming == null) {
                     existing
                 } else {
+                    // Same rules as server /sync: a LONGER night replaces the queued one as a group
+                    // (the band re-sends an in-progress night with growing duration); equal/shorter or
+                    // empty never replaces it. Previously the first queued value won forever, so a short
+                    // fragment could shadow the main night and the main night's file was then ACKed away.
+                    val incomingLonger = incoming.sleepHours > existing.sleepHours
                     existing.copy(
-                        sleepHours = if (existing.sleepHours > 0.0) existing.sleepHours else incoming.sleepHours,
-                        pulseAvgDay = incoming.pulseAvgDay,
-                        pulseAvgSleep = if (existing.pulseAvgSleep > 0) existing.pulseAvgSleep else incoming.pulseAvgSleep,
+                        sleepHours = if (incomingLonger) incoming.sleepHours else existing.sleepHours,
+                        pulseAvgDay = if (incoming.pulseAvgDay > 0) incoming.pulseAvgDay else existing.pulseAvgDay,
+                        pulseAvgSleep = when {
+                            incomingLonger && incoming.pulseAvgSleep > 0 -> incoming.pulseAvgSleep
+                            incomingLonger -> existing.pulseAvgSleep
+                            existing.pulseAvgSleep > 0 -> existing.pulseAvgSleep
+                            incoming.sleepHours == existing.sleepHours -> incoming.pulseAvgSleep
+                            else -> existing.pulseAvgSleep
+                        },
                         stepsTotal = incoming.stepsTotal,
-                        sleepAwakenings = if (existing.sleepHours > 0.0) existing.sleepAwakenings else incoming.sleepAwakenings,
+                        sleepAwakenings = if (incomingLonger) incoming.sleepAwakenings else existing.sleepAwakenings,
                     )
                 }
             } + newByDate.values
