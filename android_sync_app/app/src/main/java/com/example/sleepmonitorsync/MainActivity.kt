@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -150,7 +151,10 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Text(
                         "Sleep Monitor · ${AppVersion.label}",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = 11.sp,
+                            lineHeight = 14.sp,
+                        ),
                         fontWeight = FontWeight.Bold,
                     )
                     TextButton(onClick = { showSettings = true }) {
@@ -223,13 +227,13 @@ class MainActivity : ComponentActivity() {
                         dateFormatter = queueDateFormatter,
                     )
                 } else {
-                    WorkManagerDiagnosticsSection(workDiagnostics)
-                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         "Последняя успешная синхронизация: " + formatLastSuccessfulSync(history.lastSuccessfulSyncAt),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    WorkManagerDiagnosticsSection(workDiagnostics)
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
