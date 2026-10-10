@@ -1,5 +1,11 @@
 # Sleep Monitor — текущее состояние
 
+## build-release-install.bat: ANSI вместо PowerShell (10.10.2026)
+
+- Вызовы `powershell Write-Host -ForegroundColor Cyan` заменены на `echo %ESC%[96m...%ESC%[0m` (ярко-голубой). Символ ESC получается без PowerShell: `for /f %%a in ('echo prompt $E ^| cmd') do set "ESC=%%a"`.
+- Требуется консоль с поддержкой ANSI/VT (Windows Terminal, Windows 10+ conhost); в старой консоли вместо цвета могут появиться «←[96m». Логика скрипта не менялась. Android-код не менялся, `AppVersion` не повышалась (v100).
+- commit/push не делались; скрипт не запускался, цвет не проверялся.
+
 ## v100 (10.10.2026) — диагностика недоступности браслета
 
 - Проблема (скриншот v99): браслет ~4 ч был отключён от телефона, а вкладка WorkManager показывала только «завершён с retry» без причины.
