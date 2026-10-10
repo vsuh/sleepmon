@@ -11,11 +11,14 @@ SET "ver_f=app\src\main\java\com\example\sleepmonitorsync\AppVersion.kt"
 
 cd /d "%~dp0"
 
-powershell -NoProfile -Command "Write-Host '[0/3] Get latest changes from GitHub' -ForegroundColor Cyan"
+rem ESC character for ANSI colors (no PowerShell needed); 96 = bright cyan, 0 = reset
+for /f %%a in ('echo prompt $E ^| cmd') do set "ESC=%%a"
+
+echo %ESC%[94m[0/3] Get latest changes from GitHub%ESC%[0m
 git pull
 
 echo.
-powershell -NoProfile -Command "Write-Host '[1/3] Building signed release APK...' -ForegroundColor Cyan"
+echo %ESC%[94m[1/3] Building signed release APK...%ESC%[0m
 call gradlew.bat assembleRelease
 if errorlevel 1 (
     echo.
@@ -32,7 +35,7 @@ if not exist "%APK%" (
 )
 
 echo.
-powershell -NoProfile -Command "Write-Host '[2/3] Verifying APK signature...' -ForegroundColor Cyan"
+echo %ESC%[94m[2/3] Verifying APK signature...%ESC%[0m
 set "SDK=%ANDROID_SDK_ROOT%"
 if not defined SDK set "SDK=%ANDROID_HOME%"
 if not defined SDK (
@@ -64,7 +67,7 @@ if errorlevel 1 (
 )
 
 echo.
-powershell -NoProfile -Command "Write-Host '[3/3] Installing APK on the connected phone...' -ForegroundColor Cyan"
+echo %ESC%[94m[3/3] Installing APK on the connected phone...%ESC%[0m
 
 for /f "delims=" %%i in ('where adb 2^>nul') do set "_ADB=%%i"
 
@@ -93,6 +96,6 @@ for /f  "tokens=1,2 delims==" %%A in ('findstr /C:" const val NUM" %ver_f%') do 
 Set ver=%ver: =%
 
 echo.
-echo SUCCESS: release v%ver% APK built, signature verified, and APK installed.
+echo  %ESC%[91mSUCCESS %ESC%[92m: release v%ver% APK built, signature verified, and APK installed.%ESC%[90m
 echo APK: %APK%
 exit /b 0
