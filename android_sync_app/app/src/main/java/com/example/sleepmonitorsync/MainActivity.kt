@@ -57,9 +57,9 @@ class MainActivity : ComponentActivity() {
 
         val prefs = getSharedPreferences("prefs", MODE_PRIVATE)
 
-        val defaultServerUrl = "http://192.168.2.2:8000"
+        val defaultServerUrl = "http://192.168.2.2:8011"
         val defaultServerUrlBackup = "https://sm.vsuh.duckdns.org:912"
-        val defaultAppPin = "1679"
+        val defaultAppPin = "000000"
 
         // Defaults are write-once: an existing user value must never be overwritten
         // when Activity is recreated or a new APK is installed over the existing app.
