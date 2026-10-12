@@ -13,6 +13,8 @@ import sqlite3
 from pathlib import Path
 from typing import Callable
 
+import yaml
+
 from app import obsidian
 from app.obsidian import ObsidianFetchError
 
@@ -149,6 +151,45 @@ def _mark_sync_run(month: str) -> None:
         db.commit()
 
 
+def _merge_obsidian_owned_fields(source_content: str, obsidian_content: str | None) -> str:
+    """Keep manually owned fields and the note body exclusively from Obsidian.
+
+    Automated metrics come from the configured primary backend. When the
+    primary backend is SQLite, reconciliation must not overwrite the user's
+    Obsidian-only fields/body with stale or default values stored in SQLite.
+    """
+    def split_note(content: str, label: str) -> tuple[dict, str]:
+        if not content.startswith("---"):
+            raise RuntimeError(f"Cannot safely merge {label}: missing YAML frontmatter")
+        parts = content.split("---", 2)
+        if len(parts) < 3:
+            raise RuntimeError(f"Cannot safely merge {label}: incomplete YAML frontmatter")
+        try:
+            metadata = yaml.safe_load(parts[1]) or {}
+        except yaml.YAMLError as exc:
+            raise RuntimeError(f"Cannot safely merge {label}: invalid YAML frontmatter") from exc
+        if not isinstance(metadata, dict):
+            raise RuntimeError(f"Cannot safely merge {label}: frontmatter is not a mapping")
+        return metadata, parts[2]
+
+    source_metadata, _source_body = split_note(source_content, "SQLite note")
+    if obsidian_content is not None:
+        obsidian_metadata, obsidian_body = split_note(obsidian_content, "Obsidian note")
+    else:
+        # No Obsidian note means there are no Obsidian-owned values to import.
+        # Do not copy a potentially stale manual body out of SQLite.
+        obsidian_metadata, obsidian_body = {}, "\n\n## Заметки\n\n"
+
+    for key in ("alco", "well_being", "sleep_quality"):
+        if key in obsidian_metadata:
+            source_metadata[key] = obsidian_metadata[key]
+        else:
+            source_metadata.pop(key, None)
+
+    yaml_content = yaml.safe_dump(source_metadata, sort_keys=False, allow_unicode=True)
+    return f"---\n{yaml_content}---{obsidian_body}"
+
+
 def sync_month(
     month: str,
     force: bool = False,
@@ -180,8 +221,12 @@ def sync_month(
         secondary = secondary_get(date_str)
 
         if primary is not None:
-            if secondary != primary:
-                if not secondary_save(date_str, primary):
+            target_content = primary
+            if STORAGE_SERVICE == "sqlite" and secondary_name == "obsidian":
+                target_content = _merge_obsidian_owned_fields(primary, secondary)
+
+            if secondary != target_content:
+                if not secondary_save(date_str, target_content):
                     raise RuntimeError(
                         f"Failed to write {date_str} to {secondary_name}"
                     )
