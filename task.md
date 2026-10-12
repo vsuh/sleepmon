@@ -1,3 +1,9 @@
+## Диагностика ночных отключений Bluetooth — панель в UI (12.10.2026)
+
+- `MainActivity.kt` показывает `BandDiagnosticsPanel()` на вкладке WorkManager после существующей диагностики фоновой задачи.
+- Commit: `cdce414c06a61f3508ebc1a5ffde32852497c8bb` (`MainActivity.kt`).
+- Версия пока v101; этапы синхронизации ещё не добавлены в журнал. Компиляция и проверка на устройстве не выполнялись.
+
 ## Диагностика ночных отключений Bluetooth — регистрация включена (12.10.2026)
 
 - `SleepMonitorApp.onCreate()` теперь вызывает `BandConnectionDiagnostics.initialize(applicationContext)` до планирования WorkManager, чтобы начать собирать события Bluetooth adapter/ACL и DND при запуске процесса.
