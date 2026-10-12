@@ -1,3 +1,9 @@
+## 2026-10-12 — панель диагностики подключена к вкладке WorkManager
+
+- `MainActivity.kt`: после `WorkManagerDiagnosticsSection` добавлена `BandDiagnosticsPanel()` для просмотра, обновления, копирования и очистки локального журнала.
+- Commit `MainActivity.kt`: `cdce414c06a61f3508ebc1a5ffde32852497c8bb`.
+- AppVersion ещё v101; сборка и проверка на устройстве не выполнялись.
+
 ## 2026-10-12 — диагностика Bluetooth: подключена регистрация событий
 
 - `SleepMonitorApp.onCreate()` вызывает `BandConnectionDiagnostics.initialize(applicationContext)` до `SyncScheduler.schedule()`.
