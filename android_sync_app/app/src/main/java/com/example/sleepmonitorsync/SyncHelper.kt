@@ -36,6 +36,7 @@ object SyncHelper {
         onStatus: (String) -> Unit
     ): Boolean {
         return XiaomiBandClassicConnection.withExclusiveSppOperation {
+            BandConnectionDiagnostics.record(context, "sync_started")
             VersionedLog.i(TAG, "=== " + AppVersion.buildTag("HCI-bound sleep past-fetch; diagnostics") + " ===")
             VersionedLog.i(TAG, "Xiaomi SPP operation lock acquired")
             val credentials = BandCredentials.load(context)
@@ -52,8 +53,10 @@ object SyncHelper {
         var bandReached = false
         try {
             onStatus("🔗 Подключаюсь к Xiaomi Band...")
+            BandConnectionDiagnostics.record(context, "auth_started")
             val auth = connection.authenticate()
             if (auth.isFailure) {
+                BandConnectionDiagnostics.record(context, "auth_failed")
                 val msg = "❌ Xiaomi auth: ${auth.exceptionOrNull()?.message}"
                 WorkManagerDiagnostics.recordBandProblem(context, msg)
                 VersionedLog.e(TAG, msg, auth.exceptionOrNull())
@@ -61,9 +64,12 @@ object SyncHelper {
                 return@withExclusiveSppOperation false
             }
 
+            BandConnectionDiagnostics.record(context, "auth_succeeded")
             onStatus("📥 Загружаю накопившиеся данные с браслета...")
+            BandConnectionDiagnostics.record(context, "fetch_started")
             val fetch = connection.fetchActivityData()
             if (fetch.isFailure) {
+                BandConnectionDiagnostics.record(context, "fetch_failed")
                 val msg = "❌ Xiaomi fetch: ${fetch.exceptionOrNull()?.message}"
                 WorkManagerDiagnostics.recordBandProblem(context, msg)
                 VersionedLog.e(TAG, msg, fetch.exceptionOrNull())
@@ -72,6 +78,7 @@ object SyncHelper {
             }
 
             val result = fetch.getOrThrow()
+            BandConnectionDiagnostics.record(context, "fetch_succeeded", "files=" + result.filesReceived)
             bandReached = true
             WorkManagerDiagnostics.recordBandOk(context)
             VersionedLog.i(TAG, "Xiaomi fetch result: received=${result.filesReceived}, failed=${result.filesFailed}, unsupported=${result.filesUnsupported}, sleep=${result.sleepSummaries.size}, minuteSamples=${result.perMinuteSamples.size}, dailySummaries=${result.dailySummaries.size}")
@@ -105,6 +112,7 @@ object SyncHelper {
                 return@withExclusiveSppOperation true
             }
 
+            BandConnectionDiagnostics.record(context, "server_upload_started", "days=" + pending.days.size)
             val (activeUrl, cookie) = resolveActiveServer(primaryUrl, backupUrl, pin, onStatus)
             val successfulDays = mutableListOf<SyncQueue.PendingDay>()
             for (day in pending.days.sortedBy { it.date }) {
@@ -121,16 +129,21 @@ object SyncHelper {
                 onStatus("✅ ${day.date}: шаги ${saved.stepsTotal}, пульс ${saved.pulseAvgDay}")
             }
 
+            BandConnectionDiagnostics.record(context, "server_upload_succeeded", "days=" + successfulDays.size)
+            BandConnectionDiagnostics.record(context, "ack_started")
             if (!connection.acknowledgeFileIds(pending.fileIds)) {
+                BandConnectionDiagnostics.record(context, "ack_failed")
                 onStatus("⚠️ Сервер принял данные, но ACK браслету не удалось; локальная очередь сохранена для повтора.")
                 return@withExclusiveSppOperation false
             }
 
+            BandConnectionDiagnostics.record(context, "ack_succeeded")
             SyncHistory.record(context, successfulDays)
             SyncQueue.clear(context)
             onStatus("═══ Xiaomi sync завершён: ${pending.days.size} дн.; очередь очищена")
             return@withExclusiveSppOperation true
         } catch (e: Exception) {
+            BandConnectionDiagnostics.record(context, "sync_failed")
             VersionedLog.e(TAG, "❌ Xiaomi sync failed: ${e.message}", e)
             if (!bandReached && e !is kotlinx.coroutines.CancellationException) {
                 WorkManagerDiagnostics.recordBandProblem(
@@ -141,6 +154,7 @@ object SyncHelper {
             onStatus("❌ Xiaomi sync: ${e.localizedMessage}")
             return@withExclusiveSppOperation false
         } finally {
+            BandConnectionDiagnostics.record(context, "sync_finished")
             connection.disconnect()
             VersionedLog.i(TAG, "═══ Xiaomi sync session finished")
             }
