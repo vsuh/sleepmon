@@ -1,3 +1,9 @@
+## 2026-10-12 — диагностика Bluetooth: подключена регистрация событий
+
+- `SleepMonitorApp.onCreate()` вызывает `BandConnectionDiagnostics.initialize(applicationContext)` до `SyncScheduler.schedule()`.
+- Commit `SleepMonitorApp.kt`: `55821c37386df02c63eae9ad280dea92dcc22521`.
+- Сборщик теперь инициализируется при запуске процесса; события всё ещё ограничены временем жизни процесса. UI-панель не подключена, этапы синхронизации не размечены, AppVersion пока v101; сборка и проверка на устройстве не выполнялись.
+
 ## 2026-10-12 — модуль журнала Bluetooth (этап 1)
 
 - Созданы отдельные BandConnectionDiagnostics.kt и BandDiagnosticsPanel.kt.
