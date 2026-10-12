@@ -18,6 +18,7 @@ import android.app.Application
 class SleepMonitorApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        BandConnectionDiagnostics.initialize(applicationContext)
         SyncScheduler.schedule(applicationContext)
     }
 }
