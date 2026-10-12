@@ -1,3 +1,9 @@
+## 2026-10-12 — добавлены маркеры этапов SPP/server sync
+
+- `SyncHelper.kt` записывает этапы auth/fetch, server upload, ACK, ошибки и завершение в `BandConnectionDiagnostics`; детали — только безопасные счётчики.
+- Commit `SyncHelper.kt`: `ddcf709fd0b959d321bc6e986ded10d742567083`.
+- Сборка и тестирование на устройстве не выполнялись.
+
 ## 2026-10-12 — панель диагностики подключена к вкладке WorkManager
 
 - `MainActivity.kt`: после `WorkManagerDiagnosticsSection` добавлена `BandDiagnosticsPanel()` для просмотра, обновления, копирования и очистки локального журнала.
