@@ -234,6 +234,8 @@ class MainActivity : ComponentActivity() {
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     WorkManagerDiagnosticsSection(workDiagnostics)
+                    Spacer(modifier = Modifier.height(20.dp))
+                    BandDiagnosticsPanel()
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
