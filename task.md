@@ -1,3 +1,9 @@
+## Диагностика ночных отключений Bluetooth — регистрация включена (12.10.2026)
+
+- `SleepMonitorApp.onCreate()` теперь вызывает `BandConnectionDiagnostics.initialize(applicationContext)` до планирования WorkManager, чтобы начать собирать события Bluetooth adapter/ACL и DND при запуске процесса.
+- Commit: `55821c37386df02c63eae9ad280dea92dcc22521` (`SleepMonitorApp.kt`).
+- Панель ещё не подключена к `MainActivity`; маркеры этапов Worker/синхронизации, повышение версии до v102 и проверка сборки/устройства не выполнены.
+
 ## Диагностика ночных отключений Bluetooth — 12.10.2026
 
 - Добавлен отдельный модуль BandConnectionDiagnostics.kt: ограниченный журнал до 300 событий в приватных SharedPreferences; состояния Bluetooth adapter/ACL и фильтра «Не беспокоить»; секреты и MAC не сохраняются.
