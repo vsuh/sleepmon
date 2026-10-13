@@ -408,75 +408,83 @@ h2 {
 /* Recent-days summary */
 .history-page {
     align-items: flex-start;
-    padding: 1.5rem;
+    padding: 1.25rem;
+    overflow-x: hidden;
 }
 
 .history-container {
     width: 100%;
     max-width: 1500px;
-    padding: 1.75rem;
+    min-width: 0;
+    padding: 1.25rem;
+    overflow: hidden;
 }
 
 .history-container header {
     gap: 1rem;
 }
 
-.history-subtitle {
-    display: block;
-    margin-top: 0.4rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
-}
-
-.history-legend {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    margin-bottom: 0.75rem;
-}
-
-.alcohol-swatch {
-    width: 1rem;
-    height: 1rem;
-    border-radius: 3px;
-    background: rgba(245, 158, 11, 0.22);
-    border: 1px solid rgba(245, 158, 11, 0.6);
-    flex: 0 0 auto;
+.history-container h1 {
+    margin: 0;
 }
 
 .history-table-wrap {
     width: 100%;
-    overflow-x: auto;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
     border: 1px solid var(--border);
     border-radius: 12px;
 }
 
 .history-table {
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    font-size: 0.92rem;
+    max-width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: clamp(0.68rem, 0.78vw, 0.9rem);
     font-variant-numeric: tabular-nums;
 }
 
 .history-table th,
 .history-table td {
-    padding: 0.8rem 0.85rem;
+    padding: 0.7rem 0.45rem;
     border-bottom: 1px solid var(--border);
-    text-align: left;
+    text-align: right;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .history-table th {
     background: rgba(255, 255, 255, 0.06);
     color: var(--text-muted);
-    font-size: 0.82rem;
+    font-size: 0.8em;
     font-weight: 700;
-    position: sticky;
-    top: 0;
 }
+
+.history-table th:first-child,
+.history-table td:first-child {
+    width: 5.7rem;
+    text-align: left;
+}
+
+.history-table th:nth-child(2),
+.history-table td:nth-child(2) { width: 7%; }
+.history-table th:nth-child(3),
+.history-table td:nth-child(3) { width: 9%; }
+.history-table th:nth-child(4),
+.history-table td:nth-child(4) { width: 9%; }
+.history-table th:nth-child(5),
+.history-table td:nth-child(5) { width: 9%; }
+.history-table th:nth-child(6),
+.history-table td:nth-child(6) { width: 9%; }
+.history-table th:nth-child(7),
+.history-table td:nth-child(7) { width: 10%; }
+.history-table th:nth-child(8),
+.history-table td:nth-child(8) { width: 9%; }
+.history-table th:nth-child(9),
+.history-table td:nth-child(9) { width: 4%; }
 
 .history-table tbody tr:last-child td {
     border-bottom: 0;
@@ -486,12 +494,10 @@ h2 {
     background-color: rgba(59, 130, 246, 0.08);
 }
 
-.history-table tbody tr.has-alcohol td {
-    background-color: rgba(245, 158, 11, 0.17);
-}
-
+.history-table tbody tr.has-alcohol td,
 .history-table tbody tr.has-alcohol:hover td {
-    background-color: rgba(245, 158, 11, 0.25);
+    background-color: rgba(245, 158, 11, 0.24) !important;
+    background-image: linear-gradient(rgba(245, 158, 11, 0.10), rgba(245, 158, 11, 0.10));
 }
 
 .history-table tbody tr.is-today td {
@@ -513,51 +519,47 @@ h2 {
 }
 
 .history-table .alcohol-cell {
+    text-align: center;
     font-weight: 700;
 }
 
-.history-footnote {
-    margin: 1rem 0 0;
-    font-size: 0.85rem;
-}
-
 @media (max-width: 1200px) {
+    .history-page {
+        padding: 0.75rem;
+    }
+
     .history-container {
-        padding: 1.25rem;
+        padding: 0.9rem;
     }
 
     .history-table {
-        font-size: 0.82rem;
-        min-width: 980px;
+        font-size: 0.72rem;
     }
 
     .history-table th,
     .history-table td {
-        padding: 0.65rem 0.55rem;
+        padding: 0.55rem 0.25rem;
+    }
+
+    .history-table th:first-child,
+    .history-table td:first-child {
+        width: 4.5rem;
     }
 }
 
 @media (max-width: 1080px) {
-    .history-page {
-        padding: 1rem;
-    }
-
-    .history-container {
-        padding: 1rem;
-    }
-
     .history-table {
-        font-size: 0.78rem;
-        min-width: 920px;
+        font-size: 0.68rem;
     }
 
     .history-table th,
     .history-table td {
-        padding: 0.55rem 0.45rem;
+        padding: 0.5rem 0.18rem;
     }
 
-    .history-container header {
-        align-items: flex-start;
+    .history-table th:first-child,
+    .history-table td:first-child {
+        width: 4rem;
     }
 }
 
@@ -567,7 +569,7 @@ h2 {
     }
 
     .history-container {
-        padding: 0.9rem;
+        padding: 0.75rem;
         border-radius: 14px;
     }
 
@@ -606,6 +608,7 @@ h2 {
 
     .history-table {
         font-size: 0.9rem;
+        table-layout: auto;
     }
 
     .history-table thead {
@@ -632,6 +635,8 @@ h2 {
         white-space: normal;
         padding: 0.6rem 0.7rem;
         border-bottom: 1px solid var(--border);
+        overflow: visible;
+        text-overflow: clip;
     }
 
     .history-table td {
@@ -657,11 +662,17 @@ h2 {
         font-weight: 700;
     }
 
-    .history-table tbody tr.has-alcohol td {
-        background-color: rgba(245, 158, 11, 0.17);
+    .history-table tbody tr.has-alcohol td,
+    .history-table tbody tr.has-alcohol:hover td {
+        background-color: rgba(245, 158, 11, 0.24) !important;
+        background-image: linear-gradient(rgba(245, 158, 11, 0.10), rgba(245, 158, 11, 0.10));
     }
 
     .history-table tbody tr.is-today td.history-date {
         box-shadow: inset 0 2px rgba(96, 165, 250, 0.5);
+    }
+
+    .history-table .alcohol-cell {
+        justify-content: flex-end;
     }
 }
