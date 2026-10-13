@@ -403,3 +403,265 @@ h2 {
         font-size: 1rem;
     }
 }
+
+
+/* Recent-days summary */
+.history-page {
+    align-items: flex-start;
+    padding: 1.5rem;
+}
+
+.history-container {
+    width: 100%;
+    max-width: 1500px;
+    padding: 1.75rem;
+}
+
+.history-container header {
+    gap: 1rem;
+}
+
+.history-subtitle {
+    display: block;
+    margin-top: 0.4rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.history-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+}
+
+.alcohol-swatch {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 3px;
+    background: rgba(245, 158, 11, 0.22);
+    border: 1px solid rgba(245, 158, 11, 0.6);
+    flex: 0 0 auto;
+}
+
+.history-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.history-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.92rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.history-table th,
+.history-table td {
+    padding: 0.8rem 0.85rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.history-table th {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+}
+
+.history-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.history-table tbody tr:hover td {
+    background-color: rgba(59, 130, 246, 0.08);
+}
+
+.history-table tbody tr.has-alcohol td {
+    background-color: rgba(245, 158, 11, 0.17);
+}
+
+.history-table tbody tr.has-alcohol:hover td {
+    background-color: rgba(245, 158, 11, 0.25);
+}
+
+.history-table tbody tr.is-today td {
+    box-shadow: inset 0 1px rgba(96, 165, 250, 0.45), inset 0 -1px rgba(96, 165, 250, 0.45);
+}
+
+.history-table .numeric {
+    text-align: right;
+}
+
+.history-table .history-date a {
+    color: #60a5fa;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.history-table .history-date a:hover {
+    text-decoration: underline;
+}
+
+.history-table .alcohol-cell {
+    font-weight: 700;
+}
+
+.history-footnote {
+    margin: 1rem 0 0;
+    font-size: 0.85rem;
+}
+
+@media (max-width: 1200px) {
+    .history-container {
+        padding: 1.25rem;
+    }
+
+    .history-table {
+        font-size: 0.82rem;
+        min-width: 980px;
+    }
+
+    .history-table th,
+    .history-table td {
+        padding: 0.65rem 0.55rem;
+    }
+}
+
+@media (max-width: 1080px) {
+    .history-page {
+        padding: 1rem;
+    }
+
+    .history-container {
+        padding: 1rem;
+    }
+
+    .history-table {
+        font-size: 0.78rem;
+        min-width: 920px;
+    }
+
+    .history-table th,
+    .history-table td {
+        padding: 0.55rem 0.45rem;
+    }
+
+    .history-container header {
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 600px) {
+    .history-page {
+        padding: 0.5rem;
+    }
+
+    .history-container {
+        padding: 0.9rem;
+        border-radius: 14px;
+    }
+
+    .history-container header {
+        flex-direction: column;
+        align-items: stretch;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+    }
+
+    .history-container h1 {
+        font-size: 1.35rem;
+    }
+
+    .history-container .header-links {
+        flex-wrap: wrap;
+    }
+
+    .history-container .btn-outline {
+        padding: 0.55rem 0.7rem;
+    }
+
+    .history-table-wrap {
+        overflow: visible;
+        border: 0;
+    }
+
+    .history-table,
+    .history-table tbody,
+    .history-table tr,
+    .history-table td {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .history-table {
+        font-size: 0.9rem;
+    }
+
+    .history-table thead {
+        display: none;
+    }
+
+    .history-table tbody {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .history-table tbody tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.025);
+    }
+
+    .history-table th,
+    .history-table td {
+        white-space: normal;
+        padding: 0.6rem 0.7rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .history-table td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        min-width: 0;
+        text-align: right;
+    }
+
+    .history-table td::before {
+        content: attr(data-label);
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        text-align: left;
+    }
+
+    .history-table td.history-date {
+        grid-column: 1 / -1;
+        background: rgba(255, 255, 255, 0.055);
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .history-table tbody tr.has-alcohol td {
+        background-color: rgba(245, 158, 11, 0.17);
+    }
+
+    .history-table tbody tr.is-today td.history-date {
+        box-shadow: inset 0 2px rgba(96, 165, 250, 0.5);
+    }
+}
