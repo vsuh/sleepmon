@@ -1,3 +1,20 @@
+## 2026-10-13 — предварительный аудит лицензий и публикации исходников
+
+- Выполнен предварительный просмотр лицензирования по состоянию репозитория на 13.10.2026; добавлена/проверена сводка в `THIRD_PARTY_NOTICES.md`, README и `AI_CONTEXT.md`.
+- Корневой `LICENSE` указывает MIT-0 для файлов без более конкретных условий; это не означает, что весь репозиторий/APK однородно лицензирован MIT-0.
+- Объём проверки Gadgetbridge/AGPL не ограничивается protobuf-схемами. Явно помеченные upstream-порты, требующие проверки происхождения, применимой лицензии и обязанностей при распространении Android APK:
+  - `band/XiaomiSppFrame.kt` и `band/XiaomiSppFrameV2.kt` — кадрирование Bluetooth Classic SPP (Gadgetbridge XiaomiSppPacketV1/V2; AGPLv3 в комментариях).
+  - `band/XiaomiFrame.kt` — кадрирование Xiaomi GATT-команд (Gadgetbridge XiaomiCharacteristic; AGPLv3 в комментарии).
+  - `band/activity/XiaomiActivityFileId.kt`, `DailyDetailsParser.kt`, `DailySummaryParser.kt` и `XiaomiComplexActivityParser.kt` — идентификаторы и парсинг файлов активности (в комментариях указан Gadgetbridge/AGPLv3).
+  - `band/activity/SleepDetailsParser.kt` — использует структуру sleep-пакетов, описанную через Gadgetbridge; нужно отдельно установить, какие части являются производным кодом, а какие — независимой реализацией.
+  - `band/XiaomiBandClassicConnection.kt` и `band/XiaomiBandConnection.kt` содержат отдельные заимствованные/перенесённые элементы протокольной логики и UUID; проверить их происхождение по сравнению с upstream.
+  - `band/XiaomiCrypto.kt` описан как переписанная, а не скопированная реализация криптографической конструкции Gadgetbridge; зафиксировать provenance и не объявлять файл автоматически AGPL только по сходству алгоритма.
+  - Дополнительно: `proto/xiaomi.proto`, `proto/xiaomi_auth_only.proto` и сгенерированный `band/proto/XiaomiProto.java` — проверить производный артефакт и сохранение upstream notices.
+- `tools/xiaomi_cloud_probe/requirements.txt` фиксирует `mi_fitness_data_bridge` на `ae70f5e6e167474e93d4c2beeb8ae3d3297d5ade`; лицензия на этой ревизии указывает AGPL-3.0-only для нового кода.
+- Для подмодуля `sleepmon-dbtool` отдельная лицензия не обнаружена. Не считать его автоматически MIT-0-лицензированным.
+- Осталось: инвентаризировать точные и транзитивные Android/Python зависимости, проверить notices фактического APK, убедиться в отсутствии секретов/персональных данных в публичных исходниках и релизах, решить судьбу AGPL-компонентов и добавить лицензию в подмодуль при наличии прав.
+- Ограничение: это предварительная проверка исходников, не исчерпывающий SBOM и не юридическое заключение. Код приложения не менялся; сборка и тестирование не выполнялись.
+
 ## v102 — журнал ночных отключений Bluetooth (12.10.2026)
 
 - `AppVersion.NUMBER` повышен с 101 до 102; build date `12.10.2026`.

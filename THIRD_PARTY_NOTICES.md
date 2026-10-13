@@ -28,6 +28,31 @@ Upstream:
 
 **Action required before redistribution:** preserve source attribution and provide the applicable AGPL license text; determine and document the licensing of the generated Java artifact and how this component is distributed with the Android app. Do not remove or overwrite the existing source notices.
 
+### Additional Gadgetbridge-derived Android protocol and activity code — review required
+
+The repository comments explicitly identify the following files as ports from Gadgetbridge and/or AGPLv3 sources. These files are in the Android app and therefore must be included in the license/provenance review before redistributing an APK; the previous schema-only summary was incomplete.
+
+Explicitly marked ports:
+- `android_sync_app/app/src/main/java/com/example/sleepmonitorsync/band/XiaomiSppFrame.kt` — SPP protocol V1 frame format; comment names Gadgetbridge's `XiaomiSppPacketV1` and AGPLv3.
+- `android_sync_app/app/src/main/java/com/example/sleepmonitorsync/band/XiaomiSppFrameV2.kt` — SPP protocol V2 frame format; comment names Gadgetbridge's `XiaomiSppPacketV2` and AGPLv3.
+- `android_sync_app/app/src/main/java/com/example/sleepmonitorsync/band/XiaomiFrame.kt` — Xiaomi GATT characteristic framing; comment names Gadgetbridge's `XiaomiCharacteristic` and AGPLv3.
+- `android_sync_app/app/src/main/java/com/example/sleepmonitorsync/band/activity/XiaomiActivityFileId.kt` — activity-file identifier; comment explicitly says ported from Gadgetbridge and AGPLv3.
+- `android_sync_app/app/src/main/java/com/example/sleepmonitorsync/band/activity/DailyDetailsParser.kt` — per-minute activity records; comment names Gadgetbridge's `DailyDetailsParser` and AGPLv3.
+- `android_sync_app/app/src/main/java/com/example/sleepmonitorsync/band/activity/DailySummaryParser.kt` — daily aggregate records; comment names Gadgetbridge's `DailySummaryParser` and AGPLv3.
+- `android_sync_app/app/src/main/java/com/example/sleepmonitorsync/band/activity/XiaomiComplexActivityParser.kt` — variable-width bit-packed activity groups; comment names Gadgetbridge's `XiaomiComplexActivityParser` and AGPLv3.
+
+Additional files that need provenance review, without assuming every line is necessarily a derivative work:
+- `android_sync_app/app/src/main/java/com/example/sleepmonitorsync/band/activity/SleepDetailsParser.kt` — comments describe the format and packet interpretation using Gadgetbridge's `Xiaomi SleepDetailsParser`; determine whether the implementation contains copied expression/structure or independently written protocol handling.
+- `android_sync_app/app/src/main/java/com/example/sleepmonitorsync/band/XiaomiBandClassicConnection.kt` — contains protocol logic described as matching Gadgetbridge, including activity-file ordering and cryptographic calls; review relevant portions against upstream.
+- `android_sync_app/app/src/main/java/com/example/sleepmonitorsync/band/XiaomiBandConnection.kt` — Xiaomi UUID family is described as ported from Gadgetbridge's `XiaomiUuids`; review the actual copied material and applicable terms.
+- `android_sync_app/app/src/main/java/com/example/sleepmonitorsync/band/XiaomiCrypto.kt` — comments describe the crypto implementation as rewritten rather than copy-pasted from Gadgetbridge's `XiaomiAuthService`. Record provenance and assess the actual implementation; do not classify it as AGPL solely because it implements the same cryptographic construction.
+
+Upstream project and license:
+- https://codeberg.org/Freeyourgadget/Gadgetbridge
+- https://github.com/Freeyourgadget/Gadgetbridge/blob/master/LICENSE
+
+**Action required before redistribution:** compare each explicitly marked port and each flagged protocol section against the relevant upstream revision; determine which files/sections are derivative, preserve copyright and license notices, provide applicable AGPL text and source/offer obligations where required, and document the conclusion per file. This list identifies review scope, not a final legal determination that every listed file is necessarily subject to AGPL.
+
 ### Xiaomi Cloud probe dependency — AGPL-3.0-only at the pinned revision
 
 File:
