@@ -496,8 +496,8 @@ h2 {
 
 .history-table tbody tr.has-alcohol td,
 .history-table tbody tr.has-alcohol:hover td {
-    background-color: rgba(245, 158, 11, 0.24) !important;
-    background-image: linear-gradient(rgba(245, 158, 11, 0.10), rgba(245, 158, 11, 0.10));
+    background-color: rgb(42, 36, 86) !important;
+    background-image: none;
 }
 
 .history-table tbody tr.is-today td {
@@ -563,7 +563,7 @@ h2 {
     }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 700px) {
     .history-page {
         padding: 0.5rem;
     }
@@ -664,8 +664,8 @@ h2 {
 
     .history-table tbody tr.has-alcohol td,
     .history-table tbody tr.has-alcohol:hover td {
-        background-color: rgba(245, 158, 11, 0.24) !important;
-        background-image: linear-gradient(rgba(245, 158, 11, 0.10), rgba(245, 158, 11, 0.10));
+        background-color: rgb(42, 36, 86) !important;
+        background-image: none;
     }
 
     .history-table tbody tr.is-today td.history-date {
