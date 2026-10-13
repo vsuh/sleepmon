@@ -496,7 +496,7 @@ h2 {
 
 .history-table tbody tr.has-alcohol td,
 .history-table tbody tr.has-alcohol:hover td {
-    background-color: rgb(42, 36, 86) !important;
+    background-color: rgb(34, 29, 72) !important;
     background-image: none;
 }
 
@@ -664,7 +664,7 @@ h2 {
 
     .history-table tbody tr.has-alcohol td,
     .history-table tbody tr.has-alcohol:hover td {
-        background-color: rgb(42, 36, 86) !important;
+        background-color: rgb(34, 29, 72) !important;
         background-image: none;
     }
 
