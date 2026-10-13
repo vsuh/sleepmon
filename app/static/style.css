@@ -465,7 +465,7 @@ h2 {
 
 .history-table th:first-child,
 .history-table td:first-child {
-    width: 5.7rem;
+    width: calc(8ch + 1rem);
     text-align: left;
 }
 
@@ -543,7 +543,7 @@ h2 {
 
     .history-table th:first-child,
     .history-table td:first-child {
-        width: 4.5rem;
+        width: calc(8ch + 0.5rem);
     }
 }
 
@@ -559,7 +559,7 @@ h2 {
 
     .history-table th:first-child,
     .history-table td:first-child {
-        width: 4rem;
+        width: calc(8ch + 0.4rem);
     }
 }
 
