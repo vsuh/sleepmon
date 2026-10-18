@@ -181,10 +181,10 @@ def _merge_obsidian_owned_fields(source_content: str, obsidian_content: str | No
         obsidian_metadata, obsidian_body = {}, "\n\n## Заметки\n\n"
 
     for key in ("alco", "well_being", "sleep_quality"):
+        # An absent key in Obsidian is not an explicit deletion: keep the
+        # value from the primary SQLite source. Import only fields that exist.
         if key in obsidian_metadata:
             source_metadata[key] = obsidian_metadata[key]
-        else:
-            source_metadata.pop(key, None)
 
     yaml_content = yaml.safe_dump(source_metadata, sort_keys=False, allow_unicode=True)
     return f"---\n{yaml_content}---{obsidian_body}"
