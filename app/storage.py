@@ -180,11 +180,22 @@ def _merge_obsidian_owned_fields(source_content: str, obsidian_content: str | No
         # Do not copy a potentially stale manual body out of SQLite.
         obsidian_metadata, obsidian_body = {}, "\n\n## Заметки\n\n"
 
+    restored_missing_fields = []
     for key in ("alco", "well_being", "sleep_quality"):
-        # An absent key in Obsidian is not an explicit deletion: keep the
-        # value from the primary SQLite source. Import only fields that exist.
+        # SQLite is authoritative for the complete daily form. Obsidian may
+        # override these user-entered fields when the key is present, but a
+        # missing key is not a deletion signal: retain the SQLite value.
         if key in obsidian_metadata:
             source_metadata[key] = obsidian_metadata[key]
+        elif key in source_metadata:
+            restored_missing_fields.append(key)
+
+    if restored_missing_fields:
+        logger.warning(
+            "Obsidian frontmatter is missing SQLite-backed form fields %s; "
+            "restoring them from SQLite",
+            sorted(restored_missing_fields),
+        )
 
     yaml_content = yaml.safe_dump(source_metadata, sort_keys=False, allow_unicode=True)
     return f"---\n{yaml_content}---{obsidian_body}"
