@@ -192,6 +192,41 @@ def get_recent_dates(n: int = 5) -> list[str]:
     today = datetime.date.today()
     return [(today - datetime.timedelta(days=i)).isoformat() for i in range(n)]
 
+def parse_history_row(date_str: str, content: str | None) -> dict:
+    """Return a safe, display-ready row for the recent-days summary."""
+    row = {
+        "date": date_str,
+        "sleep_hours": None,
+        "pulse_avg_day": None,
+        "pulse_avg_sleep": None,
+        "steps_total": None,
+        "sleep_awakenings": None,
+        "well_being": None,
+        "sleep_quality": None,
+        "alco": False,
+    }
+    if not content or not content.startswith("---"):
+        return row
+    parts = content.split("---", 2)
+    if len(parts) < 3:
+        return row
+    try:
+        frontmatter = yaml.safe_load(parts[1]) or {}
+    except yaml.YAMLError:
+        logger.warning("Could not parse history note frontmatter for %s", date_str)
+        return row
+    if not isinstance(frontmatter, dict):
+        return row
+    for key in (
+        "sleep_hours", "pulse_avg_day", "pulse_avg_sleep", "steps_total",
+        "sleep_awakenings", "well_being", "sleep_quality",
+    ):
+        value = frontmatter.get(key)
+        if value not in (None, ""):
+            row[key] = value
+    row["alco"] = str(frontmatter.get("alco", False)).strip().lower() in ("true", "1", "yes", "on")
+    return row
+
 
 # ---------- Auth ----------
 
@@ -299,6 +334,25 @@ async def index(request: Request, background_tasks: BackgroundTasks, date: str =
         "today": today,
         "data": data,
         "recent_dates": recent_dates,
+    })
+
+
+@app.get("/history", response_class=HTMLResponse)
+async def history(request: Request):
+    if not verify_session(request):
+        return RedirectResponse(url="/login")
+    dates = get_recent_dates(15)
+    rows = []
+    for date_str in dates:
+        try:
+            content = await asyncio.to_thread(storage.get_note_content, date_str)
+            rows.append(parse_history_row(date_str, content))
+        except Exception as exc:
+            logger.warning("Could not read history note for %s: %s", date_str, exc)
+            rows.append(parse_history_row(date_str, None))
+    return templates.TemplateResponse(request, "history.html", {
+        "rows": rows,
+        "today": datetime.date.today().isoformat(),
     })
 
 

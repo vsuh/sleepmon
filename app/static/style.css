@@ -403,3 +403,265 @@ h2 {
         font-size: 1rem;
     }
 }
+
+
+/* Recent-days summary */
+.history-page {
+    align-items: flex-start;
+    padding: 1.25rem;
+    overflow-x: hidden;
+}
+
+.history-container {
+    width: 100%;
+    max-width: 1500px;
+    min-width: 0;
+    padding: 1.25rem;
+    overflow: hidden;
+}
+
+.history-container header {
+    gap: 1rem;
+}
+
+.history-container h1 {
+    margin: 0;
+}
+
+.history-table-wrap {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.history-table {
+    width: 100%;
+    max-width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: clamp(0.68rem, 0.78vw, 0.9rem);
+    font-variant-numeric: tabular-nums;
+}
+
+.history-table th,
+.history-table td {
+    padding: 0.7rem 0.45rem;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-table th {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+    font-size: 0.8em;
+    font-weight: 700;
+}
+
+.history-table th:first-child,
+.history-table td:first-child { width: 9%; text-align: left; }
+
+.history-table th:nth-child(2),
+.history-table td:nth-child(2) { width: 10%; }
+.history-table th:nth-child(3),
+.history-table td:nth-child(3) { width: 12%; }
+.history-table th:nth-child(4),
+.history-table td:nth-child(4) { width: 12%; }
+.history-table th:nth-child(5),
+.history-table td:nth-child(5) { width: 12%; }
+.history-table th:nth-child(6),
+.history-table td:nth-child(6) { width: 12%; }
+.history-table th:nth-child(7),
+.history-table td:nth-child(7) { width: 14%; }
+.history-table th:nth-child(8),
+.history-table td:nth-child(8) { width: 12%; }
+.history-table th:nth-child(9),
+.history-table td:nth-child(9) { width: 7%; }
+
+.history-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.history-table tbody tr:hover td {
+    background-color: rgba(59, 130, 246, 0.08);
+}
+
+.history-table tbody tr.has-alcohol td,
+.history-table tbody tr.has-alcohol:hover td {
+    background-color: rgb(34, 29, 72) !important;
+    background-image: none;
+}
+
+.history-table tbody tr.is-today td {
+    box-shadow: inset 0 1px rgba(96, 165, 250, 0.45), inset 0 -1px rgba(96, 165, 250, 0.45);
+}
+
+.history-table .numeric {
+    text-align: right;
+}
+
+.history-table .history-date a {
+    color: #60a5fa;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.history-table .history-date a:hover {
+    text-decoration: underline;
+}
+
+.history-table .alcohol-cell {
+    text-align: center;
+    font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+    .history-page {
+        padding: 0.75rem;
+    }
+
+    .history-container {
+        padding: 0.9rem;
+    }
+
+    .history-table {
+        font-size: 0.72rem;
+    }
+
+    .history-table th,
+    .history-table td {
+        padding: 0.55rem 0.25rem;
+    }
+
+}
+
+@media (max-width: 1080px) {
+    .history-table {
+        font-size: 0.68rem;
+    }
+
+    .history-table th,
+    .history-table td {
+        padding: 0.5rem 0.18rem;
+    }
+
+}
+
+@media (max-width: 700px) {
+    .history-page {
+        padding: 0.5rem;
+    }
+
+    .history-container {
+        padding: 0.75rem;
+        border-radius: 14px;
+    }
+
+    .history-container header {
+        flex-direction: column;
+        align-items: stretch;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+    }
+
+    .history-container h1 {
+        font-size: 1.35rem;
+    }
+
+    .history-container .header-links {
+        flex-wrap: wrap;
+    }
+
+    .history-container .btn-outline {
+        padding: 0.55rem 0.7rem;
+    }
+
+    .history-table-wrap {
+        overflow: visible;
+        border: 0;
+    }
+
+    .history-table,
+    .history-table tbody,
+    .history-table tr,
+    .history-table td {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .history-table {
+        font-size: 0.9rem;
+        table-layout: auto;
+    }
+
+    .history-table thead {
+        display: none;
+    }
+
+    .history-table tbody {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .history-table tbody tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.025);
+    }
+
+    .history-table th,
+    .history-table td {
+        white-space: normal;
+        padding: 0.6rem 0.7rem;
+        border-bottom: 1px solid var(--border);
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    .history-table td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        min-width: 0;
+        text-align: right;
+    }
+
+    .history-table td::before {
+        content: attr(data-label);
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        text-align: left;
+    }
+
+    .history-table td.history-date {
+        grid-column: 1 / -1;
+        background: rgba(255, 255, 255, 0.055);
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .history-table tbody tr.has-alcohol td,
+    .history-table tbody tr.has-alcohol:hover td {
+        background-color: rgb(34, 29, 72) !important;
+        background-image: none;
+    }
+
+    .history-table tbody tr.is-today td.history-date {
+        box-shadow: inset 0 2px rgba(96, 165, 250, 0.5);
+    }
+
+    .history-table .alcohol-cell {
+        justify-content: flex-end;
+    }
+}

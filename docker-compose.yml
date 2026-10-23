@@ -20,7 +20,7 @@ services:
       dockerfile: app/Dockerfile
     container_name: sleepmon_app
     ports:
-      - "8000:8000"
+      - "8011:8011"
     environment:
       - TZ=Europe/Moscow
     env_file:

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sleep Monitor — сводка за 15 дней</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+</head>
+<body class="history-page">
+    <main class="container history-container">
+        <header>
+            <div>
+                <h1>Сводка за 15 дней</h1>
+            </div>
+            <div class="header-links">
+                <a href="/" class="btn-outline">К вводу значений</a>
+                <a href="/logout" class="btn-outline">Выход</a>
+            </div>
+        </header>
+
+        <div class="history-table-wrap">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th scope="col" aria-label="Дата"></th>
+                        <th scope="col">Сон</th>
+                        <th scope="col">Как спал</th>
+                        <th scope="col">Вставал</th>
+                        <th scope="col">во сне</th>
+                        <th scope="col">Пульс</th>
+                        <th scope="col">Шагов</th>
+                        <th scope="col">Самоч.</th>
+                        <th scope="col">А</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr class="{% if row.alco %}has-alcohol{% endif %}{% if row.date == today %} is-today{% endif %}">
+                        <td data-label="" class="history-date"><a href="/?date={{ row.date }}">{{ row.date[8:10] }}.{{ row.date[5:7] }}</a></td>
+                        <td data-label="Сон" class="numeric">{{ '%.1f'|format(row.sleep_hours|float) if row.sleep_hours is not none else '-' }}</td>
+                        <td data-label="Как спал" class="numeric">{{ row.sleep_quality if row.sleep_quality is not none else '-' }}</td>
+                        <td data-label="Вставал" class="numeric">{{ row.sleep_awakenings if row.sleep_awakenings not in (none, 0, '0') else '-' }}</td>
+                        <td data-label="во сне" class="numeric">{{ row.pulse_avg_sleep if row.pulse_avg_sleep not in (none, 0, '0') else '-' }}</td>
+                        <td data-label="Пульс" class="numeric">{{ row.pulse_avg_day if row.pulse_avg_day not in (none, 0, '0') else '-' }}</td>
+                        <td data-label="Шагов" class="numeric">{{ '{:,.0f}'.format(row.steps_total|float).replace(',', ' ') if row.steps_total not in (none, 0, '0') else '-' }}</td>
+                        <td data-label="Самоч." class="numeric">{{ row.well_being if row.well_being is not none else '-' }}</td>
+                        <td data-label="А" class="alcohol-cell">{% if row.alco %}✔{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>
