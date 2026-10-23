@@ -1,3 +1,11 @@
+## Backend: JSON-эндпоинт чтения дня `GET /api/note` (23.10.2026)
+
+- Добавлен в `app/main.py` read-only маршрут `GET /api/note?date=YYYY-MM-DD` (по умолчанию — сегодня по TZ контейнера). Возвращает JSON: `date`, `storage`, `sleep_hours`, `sleep_awakenings`, `pulse_avg_day`, `pulse_avg_sleep`, `steps_total`, `well_being`, `sleep_quality`, `alco`, `notes`.
+- Читает через `storage.get_note_content` (выбранный `STORAGE_SERVICE`), в обход `NOTE_CACHE`. Ошибки: 401 без сессии, 422 при неверной дате, 404 если заметки нет, 502 при сбое чтения из хранилища.
+- Аутентификация прежняя (`verify_session`: cookie `session_pin` == `APP_PIN`), отдельный `/login` не нужен: `curl -b "session_pin=<PIN>" "http://<хост>:<порт>/api/note"`.
+- Маршрут добавлен в конец `app/main.py`; существующие `/save`, `/sync`, `/api/storage/sync` не менялись. Backend-only: Android `AppVersion` не меняется (v102).
+- Не проверено: запуск, автотесты, поведение на сервере. Для применения нужны commit/push из vault-чекаута, `git pull` и `docker compose up -d --build app` на HRLOR.
+
 ## v102 — журнал ночных отключений Bluetooth (12.10.2026)
 
 - `AppVersion.NUMBER` повышен с 101 до 102; build date `12.10.2026`.

@@ -1,3 +1,9 @@
+## 2026-10-23 — `GET /api/note` (JSON-чтение дня)
+
+- Запрос пользователя: получить сегодняшние данные при `STORAGE_SERVICE=sqlite` без парсинга HTML формы. Проверены `task.md`, `AI_CONTEXT.md`, `SESSION_LOG.md`, `app/storage.py`, `app/main.py` (через obsidian-local connector; GitHub connector и git недоступны, состояние репозитория и последние коммиты не сверялись).
+- `app/main.py`: добавлен `GET /api/note?date=YYYY-MM-DD` — проверка cookie `session_pin`, чтение через `storage.get_note_content` без кэша, JSON с полями дня; 401/404/422/502 для ошибок. Cookie можно передать прямо в curl (`-b "session_pin=<PIN>"`).
+- Backend-only, `AppVersion` не менялся. Тесты, commit/push и развёртывание не выполнялись.
+
 ## 2026-10-12 — v102: диагностика ночных отключений
 
 - `AppVersion.kt`: 101 → 102, дата 12.10.2026. Commit `9593d17cdd12c7c94dc3af066666eb32e3d06b6e`.

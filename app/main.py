@@ -587,3 +587,53 @@ async def sync_endpoint(request: Request,
     else:
         logger.error(f"❌ /sync: failed to save note for {date} to Obsidian")
         raise HTTPException(status_code=502, detail=f"Failed to save note in Obsidian for {date}")
+
+
+
+# ---------- Read API (JSON view of one day) ----------
+
+@app.get("/api/note")
+async def note_api(request: Request, date: str | None = None):
+    """Read-only JSON view of one day's note from the active storage.
+
+    Auth is the same as everywhere else: the `session_pin` cookie must equal
+    APP_PIN, so curl can authenticate directly with `-b "session_pin=<PIN>"`
+    without a separate /login round-trip. `date` is YYYY-MM-DD and defaults
+    to today (container TZ). The read bypasses NOTE_CACHE on purpose: this
+    endpoint is meant to report the actual stored state.
+    """
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    target_date = date or datetime.date.today().isoformat()
+    try:
+        datetime.date.fromisoformat(target_date)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="date must be YYYY-MM-DD")
+
+    try:
+        content = await asyncio.to_thread(storage.get_note_content, target_date)
+    except ObsidianFetchError as e:
+        logger.error(f"❌ /api/note: cannot read note for {target_date}: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Cannot read note for {target_date} from active storage: {e}",
+        )
+
+    if content is None:
+        raise HTTPException(status_code=404, detail=f"No note for {target_date}")
+
+    note = parse_note(content)
+    return JSONResponse({
+        "date": target_date,
+        "storage": storage.STORAGE_SERVICE,
+        "sleep_hours": note["sleep_hours"],
+        "sleep_awakenings": note["sleep_awakenings"],
+        "pulse_avg_day": note["pulse_avg_day"],
+        "pulse_avg_sleep": note["pulse_avg_sleep"],
+        "steps_total": note["steps_total"],
+        "well_being": note["well_being"],
+        "sleep_quality": note["sleep_quality"],
+        "alco": note["alco"],
+        "notes": note["notes"],
+    })
