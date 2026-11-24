@@ -12,6 +12,7 @@ import base64
 
 from app.config import APP_PIN
 from app import storage
+from app.steps import merge_steps_total
 from app.obsidian import ObsidianFetchError
 
 # ---------- Logging ----------
@@ -365,6 +366,7 @@ async def save(request: Request,
                pulse_avg_day: int = Form(0),
                pulse_avg_sleep: int = Form(0),
                steps_total: int = Form(0),
+               sleep_awakenings: int = Form(0),
                well_being: int = Form(9),
                sleep_quality: int = Form(9),
                alco: bool = Form(False),
@@ -373,6 +375,7 @@ async def save(request: Request,
                original_pulse_avg_day: str = Form(""),
                original_pulse_avg_sleep: str = Form(""),
                original_steps_total: str = Form(""),
+               original_sleep_awakenings: str = Form(""),
                original_well_being: str = Form("9"),
                original_sleep_quality: str = Form("9"),
                original_alco: str = Form("false"),
@@ -420,11 +423,13 @@ async def save(request: Request,
     submitted_pulse_avg_day = pulse_avg_day
     submitted_pulse_avg_sleep = pulse_avg_sleep
     submitted_steps_total = steps_total
+    submitted_sleep_awakenings = sleep_awakenings
 
     sleep_hours_changed = submitted_sleep_hours != parse_float_snapshot(original_sleep_hours)
     pulse_avg_day_changed = submitted_pulse_avg_day != parse_int_snapshot(original_pulse_avg_day)
     pulse_avg_sleep_changed = submitted_pulse_avg_sleep != parse_int_snapshot(original_pulse_avg_sleep)
     steps_total_changed = submitted_steps_total != parse_int_snapshot(original_steps_total)
+    sleep_awakenings_changed = submitted_sleep_awakenings != parse_int_snapshot(original_sleep_awakenings)
     well_being_changed = well_being != parse_int_snapshot(original_well_being)
     sleep_quality_changed = sleep_quality != parse_int_snapshot(original_sleep_quality)
     alco_changed = alco != parse_bool_snapshot(original_alco)
@@ -434,6 +439,7 @@ async def save(request: Request,
     final_pulse_avg_day = submitted_pulse_avg_day if pulse_avg_day_changed else existing["pulse_avg_day"]
     final_pulse_avg_sleep = submitted_pulse_avg_sleep if pulse_avg_sleep_changed else existing["pulse_avg_sleep"]
     final_steps_total = submitted_steps_total if steps_total_changed else existing["steps_total"]
+    final_sleep_awakenings = submitted_sleep_awakenings if sleep_awakenings_changed else existing["sleep_awakenings"]
     final_well_being = well_being if well_being_changed else existing["well_being"]
     final_sleep_quality = sleep_quality if sleep_quality_changed else existing["sleep_quality"]
     final_alco = alco if alco_changed else existing["alco"]
@@ -447,7 +453,7 @@ async def save(request: Request,
         "pulse_avg_day": final_pulse_avg_day,
         "pulse_avg_sleep": final_pulse_avg_sleep,
         "steps_total": final_steps_total,
-        "sleep_awakenings": existing["sleep_awakenings"],
+        "sleep_awakenings": final_sleep_awakenings,
         "well_being": final_well_being,
         "sleep_quality": final_sleep_quality,
         "alco": final_alco
@@ -464,8 +470,8 @@ async def save(request: Request,
             f"✅ /save: note for {date} saved successfully "
             f"(changed: sleep={sleep_hours_changed}, pulse_day={pulse_avg_day_changed}, "
             f"pulse_sleep={pulse_avg_sleep_changed}, steps={steps_total_changed}, "
-            f"well_being={well_being_changed}, sleep_quality={sleep_quality_changed}, "
-            f"alco={alco_changed}, notes={notes_changed})"
+            f"awakenings={sleep_awakenings_changed}, well_being={well_being_changed}, "
+            f"sleep_quality={sleep_quality_changed}, alco={alco_changed}, notes={notes_changed})"
         )
         target_date = date
         if navigate == "prev":
@@ -481,7 +487,6 @@ async def save(request: Request,
             content=f"<h2>Ошибка сохранения</h2><p><a href='/?date={date}'>Назад</a></p>",
             status_code=500
         )
-
 
 # ---------- Sync (Android Companion App — merge-write, never touches user fields) ----------
 
@@ -505,7 +510,8 @@ async def sync_endpoint(request: Request,
       one (the band re-sends an in-progress night with growing duration). Equal
       or shorter nights never replace; with equal duration only empty fields are
       filled. `sleep_awakenings` is the count of distinct awakenings in the night.
-    - `steps_total` is ALWAYS updated — it accumulates throughout the day and is the only stored step counter.
+    - `steps_total` is updated when the incoming value is > 0 (it accumulates throughout the day; 
+      0 = no step data, keep the stored value) and is the only stored step counter.
     - `pulse_avg_day` is updated when the incoming value is > 0 (0 = no waking
       samples yet, keep the stored one); `pulse_avg_sleep` follows the sleep
       rules above.
@@ -556,20 +562,23 @@ async def sync_endpoint(request: Request,
 
     if replace_sleep:
         final_sleep_hours = incoming_sleep_hours
-        final_sleep_awakenings = sleep_awakenings
+        # Only count awakenings if more than 10 steps recorded (band was worn/moving)
+        final_sleep_awakenings = sleep_awakenings if steps_total > 10 else 0
         final_pulse_avg_sleep = pulse_avg_sleep if pulse_avg_sleep > 0 else existing["pulse_avg_sleep"]
     else:
         final_sleep_hours = existing["sleep_hours"]
         # Same duration: only fill what is still empty (never overwrite a recorded value).
+        # Only count awakenings if more than 10 steps recorded.
         final_sleep_awakenings = (
-            sleep_awakenings if same_night and not existing["sleep_awakenings"] else existing["sleep_awakenings"]
+            (sleep_awakenings if steps_total > 10 else 0) if same_night and not existing["sleep_awakenings"] else existing["sleep_awakenings"]
         )
         final_pulse_avg_sleep = (
             pulse_avg_sleep if same_night and not existing["pulse_avg_sleep"] else existing["pulse_avg_sleep"]
         )
 
-    # steps: ALWAYS update (accumulate throughout the day)
-    final_steps_total = steps_total
+    # steps: a positive value replaces the stored one (accumulates during the day);
+    # 0 means "no step data" and never erases a recorded value.
+    final_steps_total = merge_steps_total(steps_total, existing["steps_total"])
 
     # Waking pulse: 0 means "no waking-hours samples yet" (e.g. only night data so far),
     # so it must not erase a value that was already recorded.
