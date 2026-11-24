@@ -36,8 +36,13 @@
                 </thead>
                 <tbody>
                     {% for row in rows %}
-                    <tr class="{% if row.alco %}has-alcohol{% endif %}{% if row.date == today %} is-today{% endif %}">
-                        <td data-label="" class="history-date"><a href="/?date={{ row.date }}">{{ row.date[8:10] }}.{{ row.date[5:7] }}</a></td>
+                    {#- Day of week from the ISO date (Zeller's congruence): 0=сб, 1=вс, 2=пн ... 6=пт -#}
+                    {%- set zy = row.date[0:4]|int - (1 if row.date[5:7]|int < 3 else 0) -%}
+                    {%- set zm = row.date[5:7]|int + (12 if row.date[5:7]|int < 3 else 0) -%}
+                    {%- set zh = (row.date[8:10]|int + (13 * (zm + 1)) // 5 + zy % 100 + (zy % 100) // 4 + (zy // 100) // 4 + 5 * (zy // 100)) % 7 -%}
+                    {%- set weekday = ['сб', 'вс', 'пн', 'вт', 'ср', 'чт', 'пт'][zh] %}
+                    <tr class="{% if row.alco %}has-alcohol{% endif %}{% if row.date == today %} is-today{% endif %}{% if zh < 2 %} is-weekend{% endif %}">
+                        <td data-label="" class="history-date"><a href="/?date={{ row.date }}">{{ weekday }} {{ row.date[8:10] }}.{{ row.date[5:7] }}</a></td>
                         <td data-label="Сон" class="numeric">{{ '%.1f'|format(row.sleep_hours|float) if row.sleep_hours is not none else '-' }}</td>
                         <td data-label="Как спал" class="numeric">{{ row.sleep_quality if row.sleep_quality is not none else '-' }}</td>
                         <td data-label="Вставал" class="numeric">{{ row.sleep_awakenings if row.sleep_awakenings not in (none, 0, '0') else '-' }}</td>

@@ -665,3 +665,26 @@ h2 {
         justify-content: flex-end;
     }
 }
+
+/* History: weekend rows (сб, вс) get a thin white line under the whole row */
+@media (min-width: 701px) {
+    .history-table tbody tr.is-weekend td {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+    }
+
+    /* Date cell now also holds the weekday ("пн 16.11"): widen it, take the width from neighbours (sum stays 100%) */
+    .history-table th:first-child,
+    .history-table td:first-child { width: 13%; }
+    .history-table th:nth-child(3),
+    .history-table td:nth-child(3) { width: 11%; }
+    .history-table th:nth-child(7),
+    .history-table td:nth-child(7) { width: 12%; }
+    .history-table th:nth-child(8),
+    .history-table td:nth-child(8) { width: 11%; }
+}
+
+@media (max-width: 700px) {
+    .history-table tbody tr.is-weekend td.history-date {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+    }
+}
