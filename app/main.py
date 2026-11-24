@@ -14,6 +14,7 @@ from app.config import APP_PIN
 from app import storage
 from app.steps import merge_steps_total
 from app.obsidian import ObsidianFetchError
+from app.note_template import NOTES_TEMPLATE
 
 # ---------- Logging ----------
 # `docker compose logs -t` timestamps are Docker's own daemon-level log
@@ -78,14 +79,15 @@ def parse_note(content: str | None) -> dict:
     """Extract the fields we need to preserve/merge on a /sync write.
 
     Defaults assume a brand-new note (nothing recorded yet):
-    well_being defaults to 9 for a brand-new note, no alcohol flag, no free-text notes, and the
+    well_being defaults to 9 for a brand-new note, no alcohol flag, free-text notes
+    start from NOTES_TEMPLATE (the dataview summary block of assets/note-template.md), and the
     "fill-once" numeric fields (sleep_hours/sleep phases) at 0.
     """
     result = {
         "well_being": 9,
         "sleep_quality": 9,
         "alco": False,
-        "notes": "",
+        "notes": NOTES_TEMPLATE,
         "sleep_hours": 0,
         "steps_total": 0,
         "sleep_awakenings": 0,
