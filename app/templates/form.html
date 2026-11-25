@@ -6,6 +6,7 @@
     <title>Sleep Monitor — {{ date }}</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <script>document.documentElement.classList.add('js');</script>
 </head>
 <body>
     <div class="container">
@@ -27,6 +28,7 @@
             <input type="hidden" name="original_pulse_avg_day" value="{{ data.pulse_avg_day }}">
             <input type="hidden" name="original_pulse_avg_sleep" value="{{ data.pulse_avg_sleep }}">
             <input type="hidden" name="original_steps_total" value="{{ data.steps_total }}">
+            <input type="hidden" name="original_sleep_awakenings" value="{{ data.sleep_awakenings|default(0) }}">
             <input type="hidden" name="original_well_being" value="{{ data.well_being }}">
             <input type="hidden" name="original_sleep_quality" value="{{ data.sleep_quality }}">
             <input type="hidden" name="original_alco" value="{{ 'true' if data.alco else 'false' }}">
@@ -37,8 +39,8 @@
                     <span aria-hidden="true">‹</span>
                 </button>
 
-                <div class="date-current" title="Текущая дата">
-                    {{ date }}
+                <div class="date-current" title="Текущая дата: {{ date }}">
+                    {{ date_label|default(date) }}
                 </div>
 
                 <button type="submit" name="navigate" value="next" class="date-nav-button" title="Вперед" aria-label="Вперед">
@@ -57,7 +59,10 @@
 
             <div class="form-group">
                 <label>Как спалось? (0-9):</label>
-                <input type="range" name="sleep_quality" min="0" max="9" value="{{ data.sleep_quality|default(9) }}" oninput="this.nextElementSibling.value = this.value">
+                <div class="range-control">
+                    <input type="range" name="sleep_quality" min="0" max="9" value="{{ data.sleep_quality|default(9) }}">
+                    <span class="range-grip" aria-hidden="true"></span>
+                </div>
                 <output>{{ data.sleep_quality|default(9) }}</output>
             </div>
 
@@ -73,20 +78,21 @@
             </div>
 
             <div class="form-group">
-                            <label>Шаги за день:</label>
-                            <input type="number" name="steps_total" value="{{ data.steps_total }}">
-                        </div>
+                <label>Шаги за день:</label>
+                <input type="number" name="steps_total" value="{{ data.steps_total }}">
+            </div>
 
-                        <div class="form-group">
-                            <label>Вставал (раз):</label>
-                            <input type="number" name="sleep_awakenings" value="{{ data.sleep_awakenings|default(0) }}">
-                        </div>
+            <div class="form-group">
+                <label>Вставал (раз):</label>
+                <input type="number" name="sleep_awakenings" value="{{ data.sleep_awakenings|default(0) }}">
+            </div>
 
-                        <input type="hidden" name="original_sleep_awakenings" value="{{ data.sleep_awakenings|default(0) }}">
-
-                        <div class="form-group">
-                            <label>Самочувствие (0-9):</label>
-                <input type="range" name="well_being" min="0" max="9" value="{{ data.well_being|default(9) }}" oninput="this.nextElementSibling.value = this.value">
+            <div class="form-group">
+                <label>Самочувствие (0-9):</label>
+                <div class="range-control">
+                    <input type="range" name="well_being" min="0" max="9" value="{{ data.well_being|default(9) }}">
+                    <span class="range-grip" aria-hidden="true"></span>
+                </div>
                 <output>{{ data.well_being|default(9) }}</output>
             </div>
 
@@ -105,5 +111,65 @@
             <button type="submit" name="navigate" value="save" class="btn-save">Сохранить</button>
         </form>
     </div>
+
+    <script>
+    // Sliders change only when the thumb itself is grabbed: the native <input type="range">
+    // ignores pointer events (see style.css) and a grip that follows the thumb drives it,
+    // so a swipe that merely starts on the slider scrolls the page and changes nothing.
+    (function () {
+        var THUMB = 20; // thumb width in px, keep in sync with style.css
+        document.querySelectorAll('.range-control').forEach(function (box) {
+            var input = box.querySelector('input[type="range"]');
+            var grip = box.querySelector('.range-grip');
+            var output = box.nextElementSibling;
+            var grabOffset = 0;
+
+            function range() {
+                return { min: Number(input.min), max: Number(input.max), step: Number(input.step) || 1 };
+            }
+
+            function thumbCenter(rect) {
+                var r = range();
+                var fraction = r.max > r.min ? (Number(input.value) - r.min) / (r.max - r.min) : 0;
+                return rect.left + THUMB / 2 + fraction * (rect.width - THUMB);
+            }
+
+            function sync() {
+                var rect = input.getBoundingClientRect();
+                grip.style.left = (thumbCenter(rect) - rect.left) + 'px';
+                if (output) { output.value = input.value; }
+            }
+
+            function moveTo(clientX) {
+                var rect = input.getBoundingClientRect();
+                var r = range();
+                var fraction = (clientX - grabOffset - rect.left - THUMB / 2) / (rect.width - THUMB);
+                fraction = Math.max(0, Math.min(1, fraction));
+                var value = r.min + Math.round(fraction * (r.max - r.min) / r.step) * r.step;
+                if (String(value) !== input.value) {
+                    input.value = value;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+
+            grip.addEventListener('pointerdown', function (e) {
+                grabOffset = e.clientX - thumbCenter(input.getBoundingClientRect());
+                grip.setPointerCapture(e.pointerId);
+                box.classList.add('is-dragging');
+                e.preventDefault();
+            });
+            grip.addEventListener('pointermove', function (e) {
+                if (grip.hasPointerCapture(e.pointerId)) { moveTo(e.clientX); }
+            });
+            ['pointerup', 'pointercancel'].forEach(function (name) {
+                grip.addEventListener(name, function () { box.classList.remove('is-dragging'); });
+            });
+
+            input.addEventListener('input', sync);
+            window.addEventListener('resize', sync);
+            sync();
+        });
+    })();
+    </script>
 </body>
 </html>

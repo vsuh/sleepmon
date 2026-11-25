@@ -15,6 +15,7 @@ from app import storage
 from app.steps import merge_steps_total
 from app.obsidian import ObsidianFetchError
 from app.note_template import NOTES_TEMPLATE
+from app.date_labels import format_date_label
 
 # ---------- Logging ----------
 # `docker compose logs -t` timestamps are Docker's own daemon-level log
@@ -305,6 +306,7 @@ async def index(request: Request, background_tasks: BackgroundTasks, date: str =
         "pulse_avg_day": "",
         "pulse_avg_sleep": "",
         "steps_total": "",
+        "sleep_awakenings": "",
         "well_being": 9,
         "sleep_quality": 9,
         "alco": False,
@@ -334,6 +336,7 @@ async def index(request: Request, background_tasks: BackgroundTasks, date: str =
 
     return templates.TemplateResponse(request, "form.html", {
         "date": date,
+        "date_label": format_date_label(date),
         "today": today,
         "data": data,
         "recent_dates": recent_dates,

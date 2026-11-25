@@ -688,3 +688,62 @@ h2 {
         border-bottom: 1px solid rgba(255, 255, 255, 0.6);
     }
 }
+
+/* Sliders: the native input is display-only when JS is on; a grip that follows the thumb takes the pointer,
+   so a swipe starting elsewhere on the slider scrolls the page and changes nothing */
+.range-control {
+    position: relative;
+    margin-top: 10px;
+}
+
+.range-control input[type="range"] {
+    display: block;
+    height: 28px;
+    margin-top: 0;
+}
+
+.range-grip {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 44px;
+    height: 44px;
+    margin: -22px 0 0 -22px;
+    border-radius: 50%;
+    touch-action: none;
+    cursor: grab;
+    z-index: 1;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.js .range-control .range-grip {
+    display: block;
+}
+
+.js .range-control input[type="range"] {
+    pointer-events: none;
+}
+
+.range-control.is-dragging .range-grip {
+    cursor: grabbing;
+}
+
+.range-control.is-dragging input[type="range"]::-webkit-slider-thumb {
+    transform: scale(1.2);
+}
+
+input[type="range"]::-moz-range-thumb {
+    height: 20px;
+    width: 20px;
+    border: none;
+    border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+input[type="range"]::-moz-range-track {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
