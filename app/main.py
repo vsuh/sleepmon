@@ -565,17 +565,18 @@ async def sync_endpoint(request: Request,
     replace_sleep = incoming_sleep_hours > existing_sleep_hours
     same_night = incoming_sleep_hours > 0 and incoming_sleep_hours == existing_sleep_hours
 
+    # sleep_awakenings is stored exactly as the phone sends it: the phone decides what counts
+    # as an awakening. The day's steps_total says nothing about movement during the night
+    # (and is small or 0 when the sleep file arrives in the morning), so it must not gate it.
     if replace_sleep:
         final_sleep_hours = incoming_sleep_hours
-        # Only count awakenings if more than 10 steps recorded (band was worn/moving)
-        final_sleep_awakenings = sleep_awakenings if steps_total > 10 else 0
+        final_sleep_awakenings = sleep_awakenings
         final_pulse_avg_sleep = pulse_avg_sleep if pulse_avg_sleep > 0 else existing["pulse_avg_sleep"]
     else:
         final_sleep_hours = existing["sleep_hours"]
         # Same duration: only fill what is still empty (never overwrite a recorded value).
-        # Only count awakenings if more than 10 steps recorded.
         final_sleep_awakenings = (
-            (sleep_awakenings if steps_total > 10 else 0) if same_night and not existing["sleep_awakenings"] else existing["sleep_awakenings"]
+            sleep_awakenings if same_night and not existing["sleep_awakenings"] else existing["sleep_awakenings"]
         )
         final_pulse_avg_sleep = (
             pulse_avg_sleep if same_night and not existing["pulse_avg_sleep"] else existing["pulse_avg_sleep"]
