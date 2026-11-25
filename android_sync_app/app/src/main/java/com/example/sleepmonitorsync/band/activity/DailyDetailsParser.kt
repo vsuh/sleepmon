@@ -1,5 +1,11 @@
 package com.example.sleepmonitorsync.band.activity
 
+import com.example.sleepmonitorsync.AppVersion
+import com.example.sleepmonitorsync.VersionedLog
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 /** One decoded per-minute activity sample. Fields are null when the band didn't report them for that minute. */
 data class ActivitySample(
     val timestampSeconds: Int,
@@ -20,6 +26,27 @@ data class ActivitySample(
  * per-minute records + trailing 4-byte CRC32 (already verified by the caller).
  */
 object DailyDetailsParser {
+
+    private val TAG = AppVersion.logTag("DailyDetailsParser")
+
+    /**
+     * v103 diagnostics: minutes with steps, to calibrate the rule "an awakening counts only with
+     * at least 10 steps within 2 minutes after it". Local device time, one line per file.
+     */
+    private fun logStepMinutes(fileId: XiaomiActivityFileId, samples: List<ActivitySample>) {
+        val moving = samples.filter { (it.steps ?: 0) > 0 }
+        if (moving.isEmpty()) return
+        val format = SimpleDateFormat("MM-dd HH:mm", Locale.US)
+        val body = moving.joinToString(";") { "${format.format(Date(it.timestampSeconds * 1000L))}=${it.steps}" }
+        VersionedLog.i(
+            TAG,
+            "Step minutes: file=${fileId.timestamp}, samples=${samples.size}, moving=${moving.size}, " +
+                "total=${moving.sumOf { it.steps ?: 0 }}"
+        )
+        body.chunked(3000).forEachIndexed { index, chunk ->
+            VersionedLog.i(TAG, "Step minutes #${index + 1}: $chunk")
+        }
+    }
 
     fun headerSizeForVersion(version: Int): Int? = when (version) {
         1, 2 -> 4
@@ -91,6 +118,7 @@ object DailyDetailsParser {
             minuteTs += 60
         }
 
+        logStepMinutes(fileId, samples)
         return samples
     }
 }

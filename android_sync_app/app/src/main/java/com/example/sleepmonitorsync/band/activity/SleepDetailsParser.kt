@@ -1,5 +1,7 @@
 package com.example.sleepmonitorsync.band.activity
 
+import com.example.sleepmonitorsync.AppVersion
+import com.example.sleepmonitorsync.VersionedLog
 import java.nio.BufferUnderflowException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -16,6 +18,11 @@ import java.nio.ByteOrder
  *   7-byte fileId + 1 padding + sleep header/optional samples + stage packets + CRC32.
  */
 object SleepDetailsParser {
+
+    private val TAG = AppVersion.logTag("SleepDetailsParser")
+
+    /** v103 diagnostics: cap of the raw type=0x10/0x11 packet dump, in hex characters. */
+    private const val STAGE_DUMP_LIMIT = 12_000
     data class SleepSummary(
         val bedTimeSeconds: Int,
         val wakeupTimeSeconds: Int,
@@ -37,6 +44,16 @@ object SleepDetailsParser {
         val hrBlockAverage: Int = 0,
         val hrBlockStats: String = "",
     )
+
+    private fun logStagePacketDump(bed: Int, wake: Int, wakeCount: Int, stagePackets: Int, dump: String) {
+        VersionedLog.i(
+            TAG,
+            "Sleep packets dump: bed=$bed, wake=$wake, wakeCount=$wakeCount, stagePackets=$stagePackets, chars=${dump.length}"
+        )
+        dump.chunked(3000).forEachIndexed { index, chunk ->
+            VersionedLog.i(TAG, "Sleep packets dump #${index + 1}: $chunk")
+        }
+    }
 
     fun parse(fileId: XiaomiActivityFileId, fileBytes: ByteArray): SleepSummary? {
         if (fileId.type != XiaomiActivityFileId.TYPE_ACTIVITY ||
@@ -121,6 +138,7 @@ object SleepDetailsParser {
             val packetTrace = mutableListOf<String>()
             val packetTypeCounts = linkedMapOf<Int, Int>()
             val packetPayloadTrace = mutableListOf<String>()
+            val stagePacketDump = StringBuilder()
             val rrIntervalsMs = mutableListOf<Int>()
 
             // Sleep stage packets are preceded by the fixed FF FC FA FB marker.
@@ -143,7 +161,7 @@ object SleepDetailsParser {
                 buf.position(buf.position() + 4)
                 buf.get() // packet header length
                 if (buf.remaining() < 12) break
-                buf.long // timestamp
+                val packetTimestamp = buf.long
                 buf.get() // parity
                 val type = buf.get().toInt() and 0xFF
                 // Xiaomi sleep packet dataLen is big-endian (unlike the surrounding packet fields).
@@ -167,6 +185,15 @@ object SleepDetailsParser {
                 if (type == 10 || type == 11 || type == 16 || type == 17) {
                     val preview = data.take(64).joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
                     packetPayloadTrace += "type=$type,len=$dataLen,$preview"
+                }
+                // v103 diagnostics: full raw payload of the summary (0x10) and stage (0x11) packets with
+                // their timestamps, to decode awakening times from a real capture.
+                if ((type == 0x10 || type == 0x11) && stagePacketDump.length < STAGE_DUMP_LIMIT) {
+                    stagePacketDump.append("ts=").append(packetTimestamp)
+                        .append(",type=").append(type)
+                        .append(",len=").append(dataLen)
+                        .append(",hex=").append(data.joinToString("") { "%02X".format(it.toInt() and 0xFF) })
+                        .append(';')
                 }
 
                 when {
@@ -253,6 +280,7 @@ object SleepDetailsParser {
                     flag, values.size, values.average().toInt(), values.minOrNull()!!, values.maxOrNull()!!
                 )
             }
+            logStagePacketDump(bedTime, wakeupTime, wakeCount, stagePacketCount, stagePacketDump.toString())
             SleepSummary(
                 bedTimeSeconds = bedTime,
                 wakeupTimeSeconds = wakeupTime,
