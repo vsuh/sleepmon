@@ -25,6 +25,13 @@ services:
       - TZ=Europe/Moscow
     env_file:
       - .env
+    labels:
+      - "io.portainer.server=false"
+      - "homepage.group=Dev"
+      - "homepage.name=Sleep-Monitor"
+      - "homepage.icon=https://cdn.simpleicons.org/steemit"
+      - "homepage.href=http://hl:8011/"
+      - "homepage.description=Health logger"
     volumes:
       - ./data:/data:rw
     depends_on:
