@@ -27,7 +27,7 @@ services:
       - .env
     labels:
       - "io.portainer.server=false"
-      - "homepage.group=Dev"
+      - "homepage.group=Development"
       - "homepage.name=Sleep-Monitor"
       - "homepage.icon=https://cdn.simpleicons.org/steemit"
       - "homepage.href=http://hl:8011/"
