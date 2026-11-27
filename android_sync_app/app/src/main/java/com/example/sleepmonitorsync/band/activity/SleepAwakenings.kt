@@ -15,8 +15,10 @@ import java.util.Locale
  * (wake - bed) / 60 and the number of awake pairs equals the wake count of the type 0x10 summary.
  * The file holds several revisions of the night; the longest packet is the final one.
  *
- * An awakening counts as "got up" only when the band recorded at least [MIN_STEPS] steps within
- * [WINDOW_SECONDS] after it started; fewer steps means the sleeper just turned over.
+ * An awakening counts as "got up" only when the band recorded at least [MIN_STEPS] steps while the
+ * awake segment lasted or within [WINDOW_SECONDS] after it ended; fewer steps means the sleeper just
+ * turned over. (v104 looked only at the first 2 minutes of a segment and missed a real getting-up
+ * at 05:22 inside the 05:05-05:28 segment of the night 26->27.11.)
  */
 object SleepAwakenings {
 
@@ -79,10 +81,10 @@ object SleepAwakenings {
         return if (awakenings.size == wakeCount) awakenings else null
     }
 
-    /** Steps recorded from the start of each awakening up to [WINDOW_SECONDS] after it. */
+    /** Steps recorded from the start of each awakening until [WINDOW_SECONDS] after its end. */
     fun evaluateSteps(awakenings: List<Awakening>, samples: Collection<ActivitySample>): List<Decision> =
         awakenings.map { awakening ->
-            val end = awakening.startSeconds + WINDOW_SECONDS
+            val end = awakening.startSeconds + awakening.durationMinutes * 60 + WINDOW_SECONDS
             val steps = samples
                 .filter { it.timestampSeconds in awakening.startSeconds..end }
                 .sumOf { it.steps ?: 0 }
@@ -106,7 +108,7 @@ object SleepAwakenings {
             VersionedLog.i(
                 TAG,
                 "Awakening ${time.format(Date(d.awakening.startSeconds * 1000L))} (${d.awakening.durationMinutes} min): " +
-                    "steps=${d.steps} within ${WINDOW_SECONDS}s -> " +
+                    "steps=${d.steps} during it and ${WINDOW_SECONDS}s after -> " +
                     (if (d.counted) "got up" else "turned over")
             )
         }

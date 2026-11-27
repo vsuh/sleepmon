@@ -56,16 +56,36 @@ class SleepAwakeningsTest {
     }
 
     @Test
-    fun tenStepsWithinTwoMinutesCountAsGotUp() {
+    fun tenStepsDuringTheAwakeningCountAsGotUp() {
         val evaluation = SleepAwakenings.evaluate(
             night(awakenings),
-            listOf(sample(74, 4), sample(75, 3), sample(76, 3), sample(152, 9), sample(155, 50), sample(273, 5)),
+            listOf(sample(74, 4), sample(75, 3), sample(77, 3), sample(152, 9), sample(159, 50), sample(273, 5)),
         )
         assertEquals(1, evaluation.count)
         assertTrue(evaluation.decisions[0].counted)
-        assertEquals(10, evaluation.decisions[0].steps) // the sample exactly 120 s after the start is included
-        assertFalse(evaluation.decisions[1].counted) // 9 steps, the 50 come later than +2 min
+        assertEquals(10, evaluation.decisions[0].steps) // 74..78 min is the segment, steps at +3 min are inside
+        assertFalse(evaluation.decisions[1].counted) // 9 steps; the 50 come after the segment end + 2 min
         assertFalse(evaluation.decisions[2].counted)
+    }
+
+    @Test
+    fun windowEndsTwoMinutesAfterTheSegmentEnd() {
+        val first = awakenings[1] // starts at +152 min, lasts 4 min
+        val atTheEdge = SleepAwakenings.evaluateSteps(listOf(first), listOf(sample(158, 10)))
+        assertTrue(atTheEdge[0].counted) // exactly segment end + 120 s
+        val pastTheEdge = SleepAwakenings.evaluateSteps(listOf(first), listOf(sample(159, 10)))
+        assertFalse(pastTheEdge[0].counted)
+    }
+
+    @Test
+    fun gettingUpLateInALongAwakeningIsCounted() {
+        // Night 26->27.11: awake segment 05:05-05:28 (23 min); the real getting-up was at 05:22.
+        val long = SleepAwakenings.Awakening(bed + 300 * 60, 23)
+        val gotUp = SleepAwakenings.evaluateSteps(listOf(long), listOf(sample(317, 12), sample(318, 8)))
+        assertEquals(20, gotUp[0].steps)
+        assertTrue(gotUp[0].counted)
+        val lyingAwake = SleepAwakenings.evaluateSteps(listOf(long), listOf(sample(330, 40)))
+        assertFalse(lyingAwake[0].counted) // steps long after the segment are not part of it
     }
 
     @Test
