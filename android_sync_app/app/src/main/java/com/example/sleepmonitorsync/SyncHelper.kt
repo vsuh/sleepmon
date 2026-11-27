@@ -16,6 +16,7 @@ import org.json.JSONObject
 import com.example.sleepmonitorsync.band.BandCredentials
 import com.example.sleepmonitorsync.band.XiaomiBandClassicConnection
 import com.example.sleepmonitorsync.band.activity.ActivitySample
+import com.example.sleepmonitorsync.band.activity.SleepAwakenings
 import com.example.sleepmonitorsync.band.activity.SleepDetailsParser
 
 object SyncHelper {
@@ -297,7 +298,9 @@ object SyncHelper {
                     )
                     durationMinutes / 60.0
                 } ?: 0.0,
-                sleepAwakenings = sleep?.wakeCount ?: 0,
+                // v104: only awakenings with at least 10 steps within 2 minutes count as "got up";
+                // falls back to the band's wake count when the stage list or minute data is unusable.
+                sleepAwakenings = sleep?.let { SleepAwakenings.resolve(it, unique) } ?: 0,
             )
         }
     }

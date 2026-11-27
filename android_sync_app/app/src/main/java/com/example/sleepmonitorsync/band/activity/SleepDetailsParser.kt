@@ -43,6 +43,8 @@ object SleepDetailsParser {
         val hrBlockValidCount: Int = 0,
         val hrBlockAverage: Int = 0,
         val hrBlockStats: String = "",
+        // v104: awakenings decoded from the stage packets (type 0x11); null = not decodable consistently.
+        val awakenings: List<SleepAwakenings.Awakening>? = null,
     )
 
     private fun logStagePacketDump(bed: Int, wake: Int, wakeCount: Int, stagePackets: Int, dump: String) {
@@ -139,6 +141,7 @@ object SleepDetailsParser {
             val packetTypeCounts = linkedMapOf<Int, Int>()
             val packetPayloadTrace = mutableListOf<String>()
             val stagePacketDump = StringBuilder()
+            val stagePayloads = mutableListOf<ByteArray>()
             val rrIntervalsMs = mutableListOf<Int>()
 
             // Sleep stage packets are preceded by the fixed FF FC FA FB marker.
@@ -217,6 +220,7 @@ object SleepDetailsParser {
                     }
                     type == 0x11 -> {
                         stagePacketCount++
+                        stagePayloads += data
                     }
                     type == 0x0A && dataLen % 4 == 0 -> {
                         // v70 keeps the existing low-byte decoder only as a diagnostic candidate.
@@ -281,6 +285,7 @@ object SleepDetailsParser {
                 )
             }
             logStagePacketDump(bedTime, wakeupTime, wakeCount, stagePacketCount, stagePacketDump.toString())
+            val awakenings = SleepAwakenings.decode(bedTime, wakeupTime, wakeCount, stagePayloads)
             SleepSummary(
                 bedTimeSeconds = bedTime,
                 wakeupTimeSeconds = wakeupTime,
@@ -299,6 +304,7 @@ object SleepDetailsParser {
                 hrBlockValidCount = hrValid.size,
                 hrBlockAverage = hrBlockAvg,
                 hrBlockStats = hrBlockStats,
+                awakenings = awakenings,
                 packetTrace = ("types=" + packetTypeCounts.entries.joinToString(",") { entry -> entry.key.toString() + ":" + entry.value } +
                     "|payload=" + packetPayloadTrace.joinToString(";") +
                     "|trace=" + packetTrace.joinToString(";")).take(4000),
