@@ -68,8 +68,8 @@
 
             <div class="form-row">
                 <div class="form-group">
-                    <label>Пульс (день):</label>
-                    <input type="number" name="pulse_avg_day" value="{{ data.pulse_avg_day }}">
+                    <label>Вставал (раз):</label>
+                    <input type="number" name="sleep_awakenings" value="{{ data.sleep_awakenings|default(0) }}">
                 </div>
                 <div class="form-group">
                     <label>Пульс (сон):</label>
@@ -77,14 +77,15 @@
                 </div>
             </div>
 
-            <div class="form-group">
-                <label>Шаги за день:</label>
-                <input type="number" name="steps_total" value="{{ data.steps_total }}">
-            </div>
-
-            <div class="form-group">
-                <label>Вставал (раз):</label>
-                <input type="number" name="sleep_awakenings" value="{{ data.sleep_awakenings|default(0) }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Пульс (день):</label>
+                    <input type="number" name="pulse_avg_day" value="{{ data.pulse_avg_day }}">
+                </div>
+                <div class="form-group">
+                    <label>Шаги за день:</label>
+                    <input type="number" name="steps_total" value="{{ data.steps_total }}">
+                </div>
             </div>
 
             <div class="form-group">
@@ -113,16 +114,20 @@
     </div>
 
     <script>
-    // Sliders change only when the thumb itself is grabbed: the native <input type="range">
-    // ignores pointer events (see style.css) and a grip that follows the thumb drives it,
-    // so a swipe that merely starts on the slider scrolls the page and changes nothing.
+    // Sliders change only when the thumb itself is dragged sideways: the native <input type="range">
+    // ignores pointer events (see style.css) and a small grip that follows the thumb drives it.
+    // The grip claims only horizontal drags (touch-action: pan-y) and ignores the first few pixels,
+    // so a swipe that merely starts on or near the slider scrolls the page and changes nothing.
     (function () {
         var THUMB = 20; // thumb width in px, keep in sync with style.css
+        var DEAD_ZONE = 6; // px of sideways movement before the value starts to follow the finger
         document.querySelectorAll('.range-control').forEach(function (box) {
             var input = box.querySelector('input[type="range"]');
             var grip = box.querySelector('.range-grip');
             var output = box.nextElementSibling;
             var grabOffset = 0;
+            var startX = 0;
+            var active = false;
 
             function range() {
                 return { min: Number(input.min), max: Number(input.max), step: Number(input.step) || 1 };
@@ -154,12 +159,17 @@
 
             grip.addEventListener('pointerdown', function (e) {
                 grabOffset = e.clientX - thumbCenter(input.getBoundingClientRect());
+                startX = e.clientX;
+                active = false;
                 grip.setPointerCapture(e.pointerId);
                 box.classList.add('is-dragging');
                 e.preventDefault();
             });
             grip.addEventListener('pointermove', function (e) {
-                if (grip.hasPointerCapture(e.pointerId)) { moveTo(e.clientX); }
+                if (!grip.hasPointerCapture(e.pointerId)) { return; }
+                if (!active && Math.abs(e.clientX - startX) < DEAD_ZONE) { return; }
+                active = true;
+                moveTo(e.clientX);
             });
             ['pointerup', 'pointercancel'].forEach(function (name) {
                 grip.addEventListener(name, function () { box.classList.remove('is-dragging'); });
